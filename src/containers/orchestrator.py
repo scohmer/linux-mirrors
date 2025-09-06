@@ -215,18 +215,45 @@ VOLUME ["/mirror"]
                                   capture_output=True, text=True, check=True)
             
             containers = []
-            for line in result.stdout.strip().split('\n'):
-                if line:
-                    try:
-                        container_data = json.loads(line)
-                        containers.append({
-                            'id': container_data['Id'][:12],
-                            'name': container_data['Names'][0] if isinstance(container_data['Names'], list) else container_data['Names'],
-                            'status': container_data['State'],
-                            'image': container_data['Image']
-                        })
-                    except (json.JSONDecodeError, KeyError) as e:
-                        logger.debug(f"Error parsing container data: {e}")
+            stdout = result.stdout.strip()
+            
+            if not stdout or stdout == '[]':
+                return containers
+            
+            try:
+                # Try to parse as a single JSON array first
+                container_list = json.loads(stdout)
+                if isinstance(container_list, list):
+                    for container_data in container_list:
+                        if isinstance(container_data, dict):
+                            containers.append({
+                                'id': container_data.get('Id', 'unknown')[:12],
+                                'name': container_data.get('Names', ['unknown'])[0] if isinstance(container_data.get('Names'), list) else container_data.get('Names', 'unknown'),
+                                'status': container_data.get('State', 'unknown'),
+                                'image': container_data.get('Image', 'unknown')
+                            })
+                else:
+                    # Single container object
+                    containers.append({
+                        'id': container_list.get('Id', 'unknown')[:12],
+                        'name': container_list.get('Names', ['unknown'])[0] if isinstance(container_list.get('Names'), list) else container_list.get('Names', 'unknown'),
+                        'status': container_list.get('State', 'unknown'),
+                        'image': container_list.get('Image', 'unknown')
+                    })
+            except json.JSONDecodeError:
+                # Fallback: try parsing line by line (Docker-style output)
+                for line in stdout.split('\n'):
+                    if line.strip():
+                        try:
+                            container_data = json.loads(line)
+                            containers.append({
+                                'id': container_data.get('Id', 'unknown')[:12],
+                                'name': container_data.get('Names', ['unknown'])[0] if isinstance(container_data.get('Names'), list) else container_data.get('Names', 'unknown'),
+                                'status': container_data.get('State', 'unknown'),
+                                'image': container_data.get('Image', 'unknown')
+                            })
+                        except (json.JSONDecodeError, KeyError) as e:
+                            logger.debug(f"Error parsing container data: {e}")
             
             return containers
             
