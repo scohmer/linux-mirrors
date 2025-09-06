@@ -65,13 +65,14 @@ class DistributionSelector(Container):
             with Container(classes="distribution-container"):
                 yield Static(f"{dist_name.title()} ({dist_config.type.upper()})", classes="dist-title")
                 
-                # Version checkboxes
-                self.checkboxes[dist_name] = {}
-                for version in dist_config.versions:
-                    checkbox = Checkbox(f"  {version}", value=False, id=f"{dist_name}-{version}")
-                    checkbox.can_focus = True  # Ensure checkbox can receive focus
-                    self.checkboxes[dist_name][version] = checkbox
-                    yield checkbox
+                # Version checkboxes in horizontal layout
+                with Horizontal(classes="version-row"):
+                    self.checkboxes[dist_name] = {}
+                    for version in dist_config.versions:
+                        checkbox = Checkbox(f"{version}", value=False, id=f"{dist_name}-{version}")
+                        checkbox.can_focus = True  # Ensure checkbox can receive focus
+                        self.checkboxes[dist_name][version] = checkbox
+                        yield checkbox
     
     def get_selected_distributions(self) -> Dict[str, List[str]]:
         selected = {}

@@ -43,6 +43,11 @@
     margin-bottom: 1;
 }
 
+.version-row {
+    height: auto;
+    margin-bottom: 1;
+}
+
 /* Button styling */
 #button-row {
     margin: 1 0;
@@ -93,12 +98,18 @@ DataTable > .datatable--odd-row {
 
 /* Checkboxes */
 Checkbox {
-    margin: 0 0 0 2;
+    margin: 0 1 0 0;
+    min-width: 12;
+    max-width: 16;
 }
 
 Checkbox:focus {
     background: $accent 10%;
     border: thick $accent;
+}
+
+.version-row > Checkbox {
+    margin: 0 1 0 0;
 }
 
 /* Note: Textual doesn't support :checked pseudo-class */
