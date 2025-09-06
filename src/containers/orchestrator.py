@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
-import docker
 import logging
 import asyncio
+import subprocess
+import json
 from typing import Dict, List, Optional, Any
 from pathlib import Path
 from config.manager import ConfigManager, DistributionConfig
@@ -13,28 +14,31 @@ class ContainerOrchestrator:
     def __init__(self, config_manager: ConfigManager):
         self.config_manager = config_manager
         self.config = config_manager.get_config()
-        self._client: Optional[docker.DockerClient] = None
+        self.container_runtime = self.config.container_runtime
         self._running_containers: Dict[str, Any] = {}
+        
+        # Validate container runtime is available
+        self._validate_runtime()
     
-    @property
-    def client(self) -> docker.DockerClient:
-        if self._client is None:
-            try:
-                self._client = docker.from_env()
-            except Exception as e:
-                raise RuntimeError(f"Failed to connect to Docker: {e}")
-        return self._client
+    def _validate_runtime(self):
+        """Validate that the specified container runtime is available"""
+        try:
+            result = subprocess.run([self.container_runtime, '--version'], 
+                                  capture_output=True, text=True, check=True)
+            logger.info(f"Using {self.container_runtime}: {result.stdout.strip()}")
+        except (subprocess.CalledProcessError, FileNotFoundError) as e:
+            raise RuntimeError(f"Container runtime '{self.container_runtime}' not available: {e}")
     
     def _get_container_name(self, dist_name: str, version: str) -> str:
         return f"linux-mirror-{dist_name}-{version}"
     
     def _get_image_name(self, dist_config: DistributionConfig) -> str:
         if dist_config.type == "apt":
-            return "ubuntu:latest"  # Base image for APT-based syncing
+            return "docker.io/library/ubuntu:latest"  # Base image for APT-based syncing
         else:  # yum
-            return "rockylinux:latest"  # Base image for YUM-based syncing
+            return "docker.io/library/rockylinux:latest"  # Base image for YUM-based syncing
     
-    def _create_dockerfile_content(self, dist_config: DistributionConfig) -> str:
+    def _create_containerfile_content(self, dist_config: DistributionConfig) -> str:
         if dist_config.type == "apt":
             return '''FROM ubuntu:latest
 RUN apt-get update && apt-get install -y \\
@@ -64,32 +68,47 @@ VOLUME ["/mirror"]
 '''
     
     def build_container_image(self, dist_config: DistributionConfig) -> str:
-        image_tag = f"linux-mirror-{dist_config.name}:latest"
+        image_tag = f"localhost/linux-mirror-{dist_config.name}:latest"
         
         try:
             # Check if image already exists
-            self.client.images.get(image_tag)
-            logger.info(f"Image {image_tag} already exists")
-            return image_tag
-        except docker.errors.ImageNotFound:
-            pass
+            result = subprocess.run([self.container_runtime, 'image', 'exists', image_tag], 
+                                  capture_output=True, check=False)
+            if result.returncode == 0:
+                logger.info(f"Image {image_tag} already exists")
+                return image_tag
+        except Exception as e:
+            logger.debug(f"Error checking image existence: {e}")
         
-        dockerfile_content = self._create_dockerfile_content(dist_config)
+        containerfile_content = self._create_containerfile_content(dist_config)
         
-        # Build image from Dockerfile content
+        # Build image using containerfile
         logger.info(f"Building image {image_tag}")
-        image, build_logs = self.client.images.build(
-            fileobj=dockerfile_content.encode(),
-            tag=image_tag,
-            rm=True
-        )
         
-        for log in build_logs:
-            if 'stream' in log:
-                logger.debug(log['stream'].strip())
+        # Write temporary Containerfile
+        import tempfile
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.containerfile', delete=False) as f:
+            f.write(containerfile_content)
+            containerfile_path = f.name
         
-        logger.info(f"Successfully built image {image_tag}")
-        return image_tag
+        try:
+            result = subprocess.run([
+                self.container_runtime, 'build', 
+                '-t', image_tag,
+                '-f', containerfile_path,
+                '.'  # build context
+            ], capture_output=True, text=True, check=True)
+            
+            logger.debug(f"Build output: {result.stdout}")
+            logger.info(f"Successfully built image {image_tag}")
+            return image_tag
+            
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Failed to build image {image_tag}: {e.stderr}")
+            raise
+        finally:
+            # Clean up temporary file
+            Path(containerfile_path).unlink(missing_ok=True)
     
     def create_sync_container(self, dist_name: str, version: str, command: List[str]) -> str:
         dist_config = self.config.distributions.get(dist_name)
@@ -101,134 +120,146 @@ VOLUME ["/mirror"]
         
         # Prepare volume mounts
         mirror_path = self.config_manager.get_distribution_path(dist_name)
-        volumes = {
-            mirror_path: {'bind': '/mirror', 'mode': 'rw'}
-        }
-        
-        # Environment variables
-        environment = {
-            'DIST_NAME': dist_name,
-            'DIST_VERSION': version,
-            'MIRROR_PATH': '/mirror'
-        }
         
         try:
             # Remove existing container if it exists
             try:
-                existing_container = self.client.containers.get(container_name)
-                existing_container.remove(force=True)
+                subprocess.run([self.container_runtime, 'rm', '-f', container_name], 
+                             capture_output=True, check=True)
                 logger.info(f"Removed existing container {container_name}")
-            except docker.errors.NotFound:
-                pass
+            except subprocess.CalledProcessError:
+                pass  # Container doesn't exist
             
             # Create new container
-            container = self.client.containers.create(
-                image=image_tag,
-                name=container_name,
-                command=command,
-                volumes=volumes,
-                environment=environment,
-                detach=True,
-                auto_remove=False  # Keep container for log inspection
-            )
+            create_cmd = [
+                self.container_runtime, 'create',
+                '--name', container_name,
+                '--volume', f"{mirror_path}:/mirror:rw",
+                '--env', f'DIST_NAME={dist_name}',
+                '--env', f'DIST_VERSION={version}',
+                '--env', 'MIRROR_PATH=/mirror',
+                image_tag
+            ] + command
+            
+            result = subprocess.run(create_cmd, capture_output=True, text=True, check=True)
+            container_id = result.stdout.strip()
             
             logger.info(f"Created container {container_name}")
-            return container.id
+            return container_id
             
-        except Exception as e:
-            logger.error(f"Failed to create container {container_name}: {e}")
-            raise
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Failed to create container {container_name}: {e.stderr}")
+            raise RuntimeError(f"Container creation failed: {e.stderr}")
     
     def start_sync_container(self, container_id: str) -> None:
         try:
-            container = self.client.containers.get(container_id)
-            container.start()
+            result = subprocess.run([self.container_runtime, 'start', container_id], 
+                                  capture_output=True, text=True, check=True)
             
-            self._running_containers[container_id] = container
-            logger.info(f"Started container {container.name}")
+            self._running_containers[container_id] = {'id': container_id}
+            logger.info(f"Started container {container_id}")
             
-        except Exception as e:
-            logger.error(f"Failed to start container {container_id}: {e}")
-            raise
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Failed to start container {container_id}: {e.stderr}")
+            raise RuntimeError(f"Container start failed: {e.stderr}")
     
     def stop_container(self, container_id: str, timeout: int = 10) -> None:
         try:
-            container = self.client.containers.get(container_id)
-            container.stop(timeout=timeout)
+            subprocess.run([self.container_runtime, 'stop', '-t', str(timeout), container_id], 
+                         capture_output=True, text=True, check=True)
             
             if container_id in self._running_containers:
                 del self._running_containers[container_id]
             
-            logger.info(f"Stopped container {container.name}")
+            logger.info(f"Stopped container {container_id}")
             
-        except Exception as e:
-            logger.error(f"Failed to stop container {container_id}: {e}")
-            raise
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Failed to stop container {container_id}: {e.stderr}")
+            raise RuntimeError(f"Container stop failed: {e.stderr}")
     
     def get_container_status(self, container_id: str) -> Dict[str, Any]:
         try:
-            container = self.client.containers.get(container_id)
-            container.reload()
+            result = subprocess.run([self.container_runtime, 'inspect', container_id], 
+                                  capture_output=True, text=True, check=True)
+            
+            inspect_data = json.loads(result.stdout)[0]
             
             return {
-                'id': container.id[:12],
-                'name': container.name,
-                'status': container.status,
-                'image': container.image.tags[0] if container.image.tags else 'unknown',
-                'created': container.attrs['Created'],
-                'started': container.attrs.get('State', {}).get('StartedAt'),
-                'finished': container.attrs.get('State', {}).get('FinishedAt')
+                'id': inspect_data['Id'][:12],
+                'name': inspect_data['Name'].lstrip('/'),
+                'status': inspect_data['State']['Status'],
+                'image': inspect_data['Config']['Image'],
+                'created': inspect_data['Created'],
+                'started': inspect_data['State'].get('StartedAt'),
+                'finished': inspect_data['State'].get('FinishedAt')
             }
             
-        except Exception as e:
+        except (subprocess.CalledProcessError, json.JSONDecodeError, KeyError) as e:
             logger.error(f"Failed to get status for container {container_id}: {e}")
             return {'error': str(e)}
     
     def get_container_logs(self, container_id: str, tail: int = 100) -> str:
         try:
-            container = self.client.containers.get(container_id)
-            logs = container.logs(tail=tail, timestamps=True)
-            return logs.decode('utf-8')
+            result = subprocess.run([self.container_runtime, 'logs', '--timestamps', '--tail', str(tail), container_id], 
+                                  capture_output=True, text=True, check=True)
+            return result.stdout
             
-        except Exception as e:
-            logger.error(f"Failed to get logs for container {container_id}: {e}")
-            return f"Error retrieving logs: {e}"
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Failed to get logs for container {container_id}: {e.stderr}")
+            return f"Error retrieving logs: {e.stderr}"
     
     def list_running_containers(self) -> List[Dict[str, Any]]:
         try:
-            containers = self.client.containers.list(
-                filters={'name': 'linux-mirror-*'}
-            )
+            result = subprocess.run([self.container_runtime, 'ps', '-a', '--format', 'json', 
+                                   '--filter', 'name=linux-mirror-'], 
+                                  capture_output=True, text=True, check=True)
             
-            return [
-                {
-                    'id': c.id[:12],
-                    'name': c.name,
-                    'status': c.status,
-                    'image': c.image.tags[0] if c.image.tags else 'unknown'
-                }
-                for c in containers
-            ]
+            containers = []
+            for line in result.stdout.strip().split('\n'):
+                if line:
+                    try:
+                        container_data = json.loads(line)
+                        containers.append({
+                            'id': container_data['Id'][:12],
+                            'name': container_data['Names'][0] if isinstance(container_data['Names'], list) else container_data['Names'],
+                            'status': container_data['State'],
+                            'image': container_data['Image']
+                        })
+                    except (json.JSONDecodeError, KeyError) as e:
+                        logger.debug(f"Error parsing container data: {e}")
             
-        except Exception as e:
-            logger.error(f"Failed to list containers: {e}")
+            return containers
+            
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Failed to list containers: {e.stderr}")
             return []
     
     def cleanup_stopped_containers(self) -> int:
         try:
-            containers = self.client.containers.list(
-                all=True,
-                filters={'name': 'linux-mirror-*', 'status': 'exited'}
-            )
+            # Get all stopped containers with our naming pattern
+            result = subprocess.run([self.container_runtime, 'ps', '-a', '--format', 'json',
+                                   '--filter', 'name=linux-mirror-',
+                                   '--filter', 'status=exited'], 
+                                  capture_output=True, text=True, check=True)
             
             count = 0
-            for container in containers:
-                container.remove()
-                count += 1
-                logger.info(f"Removed stopped container {container.name}")
+            for line in result.stdout.strip().split('\n'):
+                if line:
+                    try:
+                        container_data = json.loads(line)
+                        container_id = container_data['Id']
+                        container_name = container_data['Names']
+                        
+                        subprocess.run([self.container_runtime, 'rm', container_id], 
+                                     capture_output=True, check=True)
+                        count += 1
+                        logger.info(f"Removed stopped container {container_name}")
+                        
+                    except (json.JSONDecodeError, subprocess.CalledProcessError) as e:
+                        logger.debug(f"Error removing container: {e}")
             
             return count
             
-        except Exception as e:
-            logger.error(f"Failed to cleanup containers: {e}")
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Failed to cleanup containers: {e.stderr}")
             return 0

@@ -25,8 +25,27 @@ A containerized Linux repository mirroring system that synchronizes APT and DNF/
 ### Prerequisites
 
 - Python 3.8+
-- Docker or Podman
+- Podman (recommended) or Docker
 - Linux system (tested on Ubuntu/Debian/RHEL/Rocky)
+
+#### Installing Podman
+
+**Ubuntu/Debian:**
+```bash
+sudo apt update
+sudo apt install -y podman
+```
+
+**RHEL/Rocky/CentOS:**
+```bash
+sudo dnf install -y podman
+```
+
+**Enable rootless containers (recommended):**
+```bash
+sudo sysctl kernel.unprivileged_userns_clone=1
+echo 'kernel.unprivileged_userns_clone=1' | sudo tee -a /etc/sysctl.conf
+```
 
 ### Install Dependencies
 
@@ -108,7 +127,7 @@ The system uses YAML configuration files located at:
 base_path: /srv/mirror
 apt_path: /srv/mirror/apt
 yum_path: /srv/mirror/yum
-container_runtime: docker
+container_runtime: podman
 max_concurrent_syncs: 3
 log_level: INFO
 
@@ -151,7 +170,7 @@ distributions:
 ### Components
 
 1. **Configuration Management** (`src/config/`): Centralized YAML-based configuration
-2. **Container Orchestration** (`src/containers/`): Docker/Podman integration for isolated syncing
+2. **Container Orchestration** (`src/containers/`): Podman integration for isolated syncing
 3. **Repository Sync Engines** (`src/sync/`): APT and YUM synchronization logic
 4. **TUI Interfaces** (`src/tui/`): Main interface and debugging tools
 5. **Systemd Integration** (`src/systemd/`): Service unit generation and management
@@ -165,7 +184,7 @@ distributions:
 linux-mirrors/
 ├── src/
 │   ├── config/          # Configuration management
-│   ├── containers/      # Docker/Podman orchestration
+│   ├── containers/      # Podman orchestration
 │   ├── sync/           # Repository sync engines
 │   ├── tui/            # User interfaces
 │   ├── systemd/        # Service generation
@@ -210,9 +229,10 @@ linux-mirrors debug
 ### Common Issues
 
 1. **Permission Errors**: Run with appropriate privileges or use `--user` mode
-2. **Docker Connection**: Ensure Docker daemon is running and accessible
-3. **Disk Space**: Check available space with `linux-mirrors storage --info`
-4. **Container Failures**: View logs through the debug interface
+2. **Container Runtime**: Ensure Podman is installed and accessible (`podman --version`)
+3. **Rootless Containers**: For user-mode operation, ensure rootless containers are configured
+4. **Disk Space**: Check available space with `linux-mirrors storage --info`
+5. **Container Failures**: View logs through the debug interface
 
 ### Logging
 

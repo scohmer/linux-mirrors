@@ -34,9 +34,8 @@ class SystemdServiceGenerator:
         service_content = f"""[Unit]
 Description=Linux Repository Mirror - {dist_config.name.title()} {version}
 Documentation=https://github.com/your-repo/linux-mirrors
-After=network-online.target docker.service
+After=network-online.target
 Wants=network-online.target
-Requires=docker.service
 
 [Service]
 Type=oneshot
@@ -46,7 +45,7 @@ ExecStartPost=/usr/bin/logger "Mirror sync completed for {dist_config.name} {ver
 {user_directive}
 WorkingDirectory={working_directory}
 Environment="PYTHONPATH=/usr/local/lib/python3/dist-packages"
-Environment="CONTAINER_RUNTIME=docker"
+Environment="CONTAINER_RUNTIME=podman"
 TimeoutStartSec=3600
 TimeoutStopSec=60
 StandardOutput=journal
@@ -207,9 +206,8 @@ WantedBy=timers.target
         service_content = f"""[Unit]
 Description=Linux Repository Mirror - All Distributions
 Documentation=https://github.com/your-repo/linux-mirrors
-After=network-online.target docker.service
+After=network-online.target
 Wants=network-online.target
-Requires=docker.service
 
 [Service]
 Type=oneshot
@@ -219,7 +217,7 @@ ExecStartPost=/usr/bin/logger "All repository mirrors sync completed"
 {user_directive}
 WorkingDirectory={working_directory}
 Environment="PYTHONPATH=/usr/local/lib/python3/dist-packages"
-Environment="CONTAINER_RUNTIME=docker"
+Environment="CONTAINER_RUNTIME=podman"
 TimeoutStartSec=7200
 TimeoutStopSec=120
 StandardOutput=journal

@@ -23,7 +23,7 @@ class MirrorConfig:
     apt_path: str = None
     yum_path: str = None
     distributions: Dict[str, DistributionConfig] = None
-    container_runtime: str = "docker"  # 'docker' or 'podman'
+    container_runtime: str = "podman"  # 'docker' or 'podman'
     max_concurrent_syncs: int = 3
     log_level: str = "INFO"
     
