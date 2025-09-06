@@ -129,11 +129,26 @@ async def cmd_sync(args, config_manager: ConfigManager, sync_manager: SyncManage
         print("Syncing all enabled distributions...")
         enabled_dists = config_manager.get_enabled_distributions()
         
+        # Prepare distributions dict for the new sync method
+        distributions = {}
         for dist_name, dist_config in enabled_dists.items():
-            print(f"Syncing {dist_name}...")
-            results = await sync_manager.sync_distribution(dist_config)
-            
-            for result in results:
+            distributions[dist_name] = dist_config.versions
+        
+        print("Using optimized sync strategy (APT sequential, YUM parallel)...")
+        results = await sync_manager.sync_multiple_distributions(distributions)
+        
+        # Group results by distribution for display
+        by_dist = {}
+        for result in results:
+            dist_name = result.get('distribution', 'unknown')
+            if dist_name not in by_dist:
+                by_dist[dist_name] = []
+            by_dist[dist_name].append(result)
+        
+        # Display results grouped by distribution
+        for dist_name, dist_results in by_dist.items():
+            print(f"\n{dist_name}:")
+            for result in dist_results:
                 status = result.get('status', 'unknown')
                 version = result.get('version', 'unknown')
                 if status == 'completed':

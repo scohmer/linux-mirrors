@@ -208,41 +208,27 @@ class MainInterface(App):
             self.notify("Starting repository synchronization", severity="info")
             logger.info(f"TUI sync starting for: {selected_distributions}")
             
-            # Prepare sync tasks
-            sync_tasks = []
+            # Update progress for all selected versions
             for dist_name, versions in selected_distributions.items():
-                dist_config = self.config_manager.get_config().distributions[dist_name]
-                logger.info(f"Creating sync task for {dist_name} versions: {versions}")
-                
-                # Update progress for each version
                 for version in versions:
                     self.progress.update_progress(dist_name, version, "pending")
-                
-                # Create sync task
-                task = self.sync_manager.sync_distribution(dist_config, versions)
-                sync_tasks.append(task)
             
-            logger.info(f"Created {len(sync_tasks)} sync tasks")
+            # Use the new sync_multiple_distributions method for proper concurrency control
+            logger.info(f"Starting multi-distribution sync for: {selected_distributions}")
+            all_results = await self.sync_manager.sync_multiple_distributions(selected_distributions)
+            logger.info(f"Multi-distribution sync completed with {len(all_results)} results")
             
-            # Execute all sync tasks
-            all_results = []
-            for i, task in enumerate(sync_tasks):
-                logger.info(f"Executing sync task {i+1}/{len(sync_tasks)}")
-                results = await task
-                logger.info(f"Task {i+1} completed with {len(results)} results")
-                all_results.extend(results)
-                
-                # Update progress for completed syncs
-                for result in results:
-                    status = result.get('status', 'unknown')
-                    error = result.get('error', '')
-                    logger.info(f"Result: {result.get('distribution')} {result.get('version')} = {status}")
-                    self.progress.update_progress(
-                        result['distribution'],
-                        result['version'],
-                        status,
-                        error if status == 'failed' else ''
-                    )
+            # Update progress for completed syncs
+            for result in all_results:
+                status = result.get('status', 'unknown')
+                error = result.get('error', '')
+                logger.info(f"Result: {result.get('distribution')} {result.get('version')} = {status}")
+                self.progress.update_progress(
+                    result['distribution'],
+                    result['version'],
+                    status,
+                    error if status == 'failed' else ''
+                )
             
             self.sync_results = all_results
             
