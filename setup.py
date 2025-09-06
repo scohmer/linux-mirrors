@@ -32,7 +32,7 @@ setup(
     install_requires=requirements,
     entry_points={
         "console_scripts": [
-            "linux-mirrors=main:main",
+            "linux-mirrors=cli:main",
         ],
     },
 )
