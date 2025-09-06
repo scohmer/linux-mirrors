@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import asyncio
+import logging
 from typing import Dict, List, Optional, Any
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal, Vertical
@@ -11,6 +12,8 @@ from textual.screen import Screen
 from config.manager import ConfigManager
 from containers.orchestrator import ContainerOrchestrator
 from storage.manager import StorageManager
+
+logger = logging.getLogger(__name__)
 
 class LogViewer(Container):
     def __init__(self, orchestrator: ContainerOrchestrator):
@@ -114,8 +117,51 @@ class ContainerManager(Container):
             self.notify(f"Failed to cleanup containers: {e}", severity="error")
     
     def stop_all_containers(self):
-        # This would be implemented to stop all mirror-related containers
-        self.notify("Stop all containers - not implemented yet", severity="warning")
+        try:
+            # Get all running linux-mirror containers
+            containers = self.orchestrator.list_running_containers()
+            
+            if not containers:
+                self.notify("No running containers to stop", severity="info")
+                return
+            
+            # Filter for only running containers (not exited ones)
+            running_containers = [c for c in containers if c.get('status') in ['running', 'up']]
+            
+            if not running_containers:
+                self.notify("No running containers found", severity="info")
+                return
+            
+            stopped_count = 0
+            failed_count = 0
+            
+            for container in running_containers:
+                container_id = container.get('id')
+                container_name = container.get('name', 'unknown')
+                
+                if container_id:
+                    try:
+                        self.orchestrator.stop_container(container_id)
+                        stopped_count += 1
+                        logger.info(f"Stopped container {container_name}")
+                    except Exception as e:
+                        failed_count += 1
+                        logger.error(f"Failed to stop container {container_name}: {e}")
+            
+            # Show results
+            if stopped_count > 0:
+                self.notify(f"Stopped {stopped_count} containers" + 
+                           (f", {failed_count} failed" if failed_count > 0 else ""), 
+                           severity="success" if failed_count == 0 else "warning")
+            else:
+                self.notify(f"Failed to stop all containers", severity="error")
+            
+            # Refresh the container list
+            self.refresh_containers()
+            
+        except Exception as e:
+            logger.error(f"Error in stop_all_containers: {e}")
+            self.notify(f"Failed to stop containers: {e}", severity="error")
     
     def stop_selected_container(self):
         container_input = self.query_one("#container-action-input", Input)
