@@ -275,20 +275,69 @@ VOLUME ["/mirror"]
                                   capture_output=True, text=True, check=True)
             
             count = 0
-            for line in result.stdout.strip().split('\n'):
-                if line:
-                    try:
-                        container_data = json.loads(line)
-                        container_id = container_data['Id']
-                        container_name = container_data['Names']
-                        
-                        subprocess.run([self.container_runtime, 'rm', container_id], 
-                                     capture_output=True, check=True)
-                        count += 1
-                        logger.info(f"Removed stopped container {container_name}")
-                        
-                    except (json.JSONDecodeError, subprocess.CalledProcessError) as e:
-                        logger.debug(f"Error removing container: {e}")
+            stdout = result.stdout.strip()
+            
+            if not stdout or stdout == '[]':
+                logger.info("No stopped containers to cleanup")
+                return 0
+            
+            try:
+                # Try to parse as a single JSON array first
+                container_list = json.loads(stdout)
+                if isinstance(container_list, list):
+                    for container_data in container_list:
+                        if isinstance(container_data, dict):
+                            container_id = container_data.get('Id')
+                            container_name = container_data.get('Names')
+                            if isinstance(container_name, list) and container_name:
+                                container_name = container_name[0]
+                            
+                            if container_id:
+                                try:
+                                    subprocess.run([self.container_runtime, 'rm', container_id], 
+                                                 capture_output=True, check=True)
+                                    count += 1
+                                    logger.info(f"Removed stopped container {container_name}")
+                                except subprocess.CalledProcessError as e:
+                                    logger.warning(f"Failed to remove container {container_id}: {e.stderr}")
+                else:
+                    # Single container object
+                    container_id = container_list.get('Id')
+                    container_name = container_list.get('Names')
+                    if isinstance(container_name, list) and container_name:
+                        container_name = container_name[0]
+                    
+                    if container_id:
+                        try:
+                            subprocess.run([self.container_runtime, 'rm', container_id], 
+                                         capture_output=True, check=True)
+                            count += 1
+                            logger.info(f"Removed stopped container {container_name}")
+                        except subprocess.CalledProcessError as e:
+                            logger.warning(f"Failed to remove container {container_id}: {e.stderr}")
+                            
+            except json.JSONDecodeError:
+                # Fallback: try parsing line by line
+                logger.debug("Falling back to line-by-line parsing")
+                for line in stdout.split('\n'):
+                    if line.strip():
+                        try:
+                            container_data = json.loads(line)
+                            container_id = container_data.get('Id')
+                            container_name = container_data.get('Names')
+                            if isinstance(container_name, list) and container_name:
+                                container_name = container_name[0]
+                            
+                            if container_id:
+                                try:
+                                    subprocess.run([self.container_runtime, 'rm', container_id], 
+                                                 capture_output=True, check=True)
+                                    count += 1
+                                    logger.info(f"Removed stopped container {container_name}")
+                                except subprocess.CalledProcessError as e:
+                                    logger.warning(f"Failed to remove container {container_id}: {e.stderr}")
+                        except (json.JSONDecodeError, KeyError) as e:
+                            logger.debug(f"Error parsing container data: {e}")
             
             return count
             
