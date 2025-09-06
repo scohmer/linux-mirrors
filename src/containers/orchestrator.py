@@ -93,14 +93,16 @@ VOLUME ["/mirror"]
             containerfile_path = f.name
         
         try:
-            result = subprocess.run([
-                self.container_runtime, 'build', 
-                '-t', image_tag,
-                '-f', containerfile_path,
-                '.'  # build context
-            ], capture_output=True, text=True, check=True)
+            # Use DEVNULL for stdin/stdout/stderr to completely suppress output
+            with open(os.devnull, 'w') as devnull:
+                result = subprocess.run([
+                    self.container_runtime, 'build', 
+                    '-t', image_tag,
+                    '-f', containerfile_path,
+                    '--quiet',  # Suppress build output
+                    '.'  # build context
+                ], stdout=devnull, stderr=subprocess.PIPE, text=True, check=True)
             
-            logger.debug(f"Build output: {result.stdout}")
             logger.info(f"Successfully built image {image_tag}")
             return image_tag
             
