@@ -7,7 +7,7 @@ import psutil
 from typing import Dict, List, Optional, Any
 from pathlib import Path
 from datetime import datetime, timedelta
-from ..config.manager import ConfigManager
+from config.manager import ConfigManager
 
 logger = logging.getLogger(__name__)
 

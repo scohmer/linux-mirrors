@@ -7,13 +7,13 @@ import asyncio
 import logging
 from typing import List, Optional
 
-from .config.manager import ConfigManager
-from .containers.orchestrator import ContainerOrchestrator  
-from .sync.engines import SyncManager
-from .systemd.service_generator import SystemdServiceGenerator
-from .storage.manager import StorageManager
-from .tui.main_interface import MainInterface
-from .tui.debug_interface import DebugInterface
+from config.manager import ConfigManager
+from containers.orchestrator import ContainerOrchestrator  
+from sync.engines import SyncManager
+from systemd.service_generator import SystemdServiceGenerator
+from storage.manager import StorageManager
+from tui.main_interface import MainInterface
+from tui.debug_interface import DebugInterface
 
 def setup_logging(level: str = "INFO"):
     """Configure logging for the application"""

@@ -5,7 +5,7 @@ import logging
 import asyncio
 from typing import Dict, List, Optional, Any
 from pathlib import Path
-from ..config.manager import ConfigManager, DistributionConfig
+from config.manager import ConfigManager, DistributionConfig
 
 logger = logging.getLogger(__name__)
 

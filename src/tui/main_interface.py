@@ -10,9 +10,9 @@ from textual.message import Message
 from rich.text import Text
 from rich.console import Console
 
-from ..config.manager import ConfigManager, DistributionConfig
-from ..containers.orchestrator import ContainerOrchestrator
-from ..sync.engines import SyncManager
+from config.manager import ConfigManager, DistributionConfig
+from containers.orchestrator import ContainerOrchestrator
+from sync.engines import SyncManager
 
 class SyncProgress(Static):
     def __init__(self, *args, **kwargs):

@@ -8,9 +8,9 @@ from textual.widgets import Header, Footer, Static, Button, Log, DataTable, Inpu
 from textual.reactive import reactive
 from textual.screen import Screen
 
-from ..config.manager import ConfigManager
-from ..containers.orchestrator import ContainerOrchestrator
-from ..storage.manager import StorageManager
+from config.manager import ConfigManager
+from containers.orchestrator import ContainerOrchestrator
+from storage.manager import StorageManager
 
 class LogViewer(Container):
     def __init__(self, orchestrator: ContainerOrchestrator):

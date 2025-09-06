@@ -6,8 +6,8 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Any
 from pathlib import Path
-from ..config.manager import DistributionConfig
-from ..containers.orchestrator import ContainerOrchestrator
+from config.manager import DistributionConfig
+from containers.orchestrator import ContainerOrchestrator
 
 logger = logging.getLogger(__name__)
 
