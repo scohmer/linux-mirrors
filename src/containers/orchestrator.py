@@ -4,6 +4,7 @@ import logging
 import asyncio
 import subprocess
 import json
+import os
 from typing import Dict, List, Optional, Any
 from pathlib import Path
 from config.manager import ConfigManager, DistributionConfig
@@ -121,6 +122,9 @@ VOLUME ["/mirror"]
         # Prepare volume mounts
         mirror_path = self.config_manager.get_distribution_path(dist_name)
         
+        # Ensure the mirror directory exists with proper permissions
+        os.makedirs(mirror_path, mode=0o755, exist_ok=True)
+        
         try:
             # Remove existing container if it exists
             try:
@@ -130,11 +134,12 @@ VOLUME ["/mirror"]
             except subprocess.CalledProcessError:
                 pass  # Container doesn't exist
             
-            # Create new container
+            # Create new container with proper Podman volume handling
             create_cmd = [
                 self.container_runtime, 'create',
                 '--name', container_name,
-                '--volume', f"{mirror_path}:/mirror:rw",
+                '--volume', f"{mirror_path}:/mirror:rw,Z",  # Add SELinux context
+                '--userns=keep-id',  # Keep host UID/GID mapping
                 '--env', f'DIST_NAME={dist_name}',
                 '--env', f'DIST_VERSION={version}',
                 '--env', 'MIRROR_PATH=/mirror',
