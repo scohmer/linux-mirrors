@@ -1,0 +1,12 @@
+* I want to build a project that fully sync's apt repositories and dnf repositories for the following linux distos:
+1. Debian from version 7 forward.
+2. Ubuntu from version 18.04 forward.
+3. Rocky Linux from version 8 forward.
+4. Red Hat Enterprise Linux from version 8 forward.
+5. Kali Linux
+
+* I'd like the approach to be containerized.
+* I'd like to centralized the configuration file for the project so that we can limit the amount of repetition.
+* I'd like to create a systemd service unit and timer for each distro.
+* I'd like the base of the project to be /srv/mirror and to create /srv/mirror/apt and /srv/mirror/yum beneath, followed by the name of the distro: debian, ubuntu, kali and rocky, rhel.
+* I'd like to use a ncurses TUI menu to allow the user to select whether they would like to sync all repos or select repos/versions.
