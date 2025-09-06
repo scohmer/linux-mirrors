@@ -116,6 +116,13 @@ class ConfigManager:
                     distributions[name] = DistributionConfig(**dist_data)
                 data['distributions'] = distributions
             
+            # Handle path defaults for user permissions
+            if 'base_path' not in data or data['base_path'] == '/srv/mirror':
+                # Force recalculation of paths based on current user permissions
+                data.pop('base_path', None)
+                data.pop('apt_path', None)
+                data.pop('yum_path', None)
+            
             self._config = MirrorConfig(**data)
             return self._config
             

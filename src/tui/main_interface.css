@@ -88,9 +88,8 @@ Checkbox {
     margin: 0 0 0 2;
 }
 
-Checkbox:checked {
-    color: $success;
-}
+/* Note: Textual doesn't support :checked pseudo-class */
+/* Checkbox styling is handled by the framework */
 
 /* Status colors */
 .status-pending {
