@@ -142,24 +142,24 @@ class YumSyncEngine(SyncEngine):
     def generate_sync_command(self, version: str) -> List[str]:
         repo_name = f"{self.dist_config.name}-{version}"
         
-        # Create reposync command for each architecture
+        # Create repository configuration first
+        repo_config = self._generate_yum_repo_config(version)
+        config_file = f"/mirror/{repo_name}.repo"
+        
+        # Create reposync command for each architecture using the config file
         commands = []
         for arch in self.dist_config.architectures:
             for mirror_url in self.dist_config.mirror_urls:
-                repo_url = f"{mirror_url}{version}/BaseOS/{arch}/os/"
-                cmd = f"reposync --gpgcheck --plugins --repoid={repo_name}-baseos-{arch} --arch={arch} --download_path=/mirror/{arch} --downloadcomps --download-metadata"
+                # Use --config option to specify our repo file location
+                cmd = f"reposync --config={config_file} --repoid={repo_name}-baseos-{arch} --arch={arch} --download_path=/mirror/{arch} --downloadcomps --download-metadata"
                 commands.append(cmd)
                 
                 # Add AppStream repository
-                appstream_url = f"{mirror_url}{version}/AppStream/{arch}/os/"
-                appstream_cmd = f"reposync --gpgcheck --plugins --repoid={repo_name}-appstream-{arch} --arch={arch} --download_path=/mirror/{arch} --downloadcomps --download-metadata"
+                appstream_cmd = f"reposync --config={config_file} --repoid={repo_name}-appstream-{arch} --arch={arch} --download_path=/mirror/{arch} --downloadcomps --download-metadata"
                 commands.append(appstream_cmd)
         
-        # Create repository configuration first
-        repo_config = self._generate_yum_repo_config(version)
-        
         full_command = f'''
-        echo "{repo_config}" > /etc/yum.repos.d/{repo_name}.repo &&
+        echo "{repo_config}" > {config_file} &&
         {' && '.join(commands)} &&
         createrepo /mirror/
         '''
