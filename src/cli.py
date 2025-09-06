@@ -9,7 +9,7 @@ proper package imports when installed via pip.
 
 def main():
     """Entry point for the linux-mirrors CLI command."""
-    from .main import main as main_func
+    from main import main as main_func
     return main_func()
 
 if __name__ == "__main__":
