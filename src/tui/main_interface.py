@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import asyncio
+import logging
 from typing import Dict, List, Optional, Any
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal, Vertical
@@ -14,6 +15,8 @@ from config.manager import ConfigManager, DistributionConfig
 from containers.orchestrator import ContainerOrchestrator
 from sync.engines import SyncManager
 from .debug_interface import DebugInterface
+
+logger = logging.getLogger(__name__)
 
 class SyncProgress(Static):
     def __init__(self, *args, **kwargs):
@@ -105,6 +108,7 @@ class MainInterface(App):
         ("ctrl+n", "clear_all", "Clear All"),
         ("ctrl+s", "start_sync", "Start Sync"),
         ("ctrl+d", "debug_menu", "Debug Menu"),
+        ("ctrl+r", "reset_sync", "Reset Sync State"),
         ("ctrl+q", "quit", "Quit"),
     ]
     
@@ -115,6 +119,7 @@ class MainInterface(App):
         self.sync_manager = SyncManager(self.orchestrator)
         self.is_syncing = reactive(False)
         self.sync_results: List[Dict[str, Any]] = []
+        self._current_sync_task: Optional[asyncio.Task] = None
     
     def compose(self) -> ComposeResult:
         yield Header()
@@ -173,6 +178,15 @@ class MainInterface(App):
         """Open debug menu via keyboard shortcut"""
         self.push_screen("debug")
     
+    def action_reset_sync(self):
+        """Reset sync state manually - useful for debugging"""
+        self.is_syncing = False
+        if hasattr(self, '_current_sync_task') and self._current_sync_task:
+            if not self._current_sync_task.done():
+                self._current_sync_task.cancel()
+        self._current_sync_task = None
+        self.notify("Sync state reset", severity="info")
+    
     def start_sync_process(self):
         if self.is_syncing:
             self.notify("Sync already in progress", severity="warning")
@@ -184,16 +198,21 @@ class MainInterface(App):
             return
         
         self.is_syncing = True
-        asyncio.create_task(self._run_sync(selected))
+        # Create and store the sync task so it doesn't get garbage collected
+        sync_task = asyncio.create_task(self._run_sync(selected))
+        # Store task reference to prevent garbage collection
+        self._current_sync_task = sync_task
     
     async def _run_sync(self, selected_distributions: Dict[str, List[str]]):
         try:
             self.notify("Starting repository synchronization", severity="info")
+            logger.info(f"TUI sync starting for: {selected_distributions}")
             
             # Prepare sync tasks
             sync_tasks = []
             for dist_name, versions in selected_distributions.items():
                 dist_config = self.config_manager.get_config().distributions[dist_name]
+                logger.info(f"Creating sync task for {dist_name} versions: {versions}")
                 
                 # Update progress for each version
                 for version in versions:
@@ -203,16 +222,21 @@ class MainInterface(App):
                 task = self.sync_manager.sync_distribution(dist_config, versions)
                 sync_tasks.append(task)
             
+            logger.info(f"Created {len(sync_tasks)} sync tasks")
+            
             # Execute all sync tasks
             all_results = []
-            for task in sync_tasks:
+            for i, task in enumerate(sync_tasks):
+                logger.info(f"Executing sync task {i+1}/{len(sync_tasks)}")
                 results = await task
+                logger.info(f"Task {i+1} completed with {len(results)} results")
                 all_results.extend(results)
                 
                 # Update progress for completed syncs
                 for result in results:
                     status = result.get('status', 'unknown')
                     error = result.get('error', '')
+                    logger.info(f"Result: {result.get('distribution')} {result.get('version')} = {status}")
                     self.progress.update_progress(
                         result['distribution'],
                         result['version'],
@@ -225,14 +249,18 @@ class MainInterface(App):
             # Show completion notification
             successful = len([r for r in all_results if r.get('status') == 'completed'])
             total = len(all_results)
+            logger.info(f"Sync completed: {successful}/{total} successful")
             self.notify(f"Sync completed: {successful}/{total} successful", 
                        severity="success" if successful == total else "warning")
             
         except Exception as e:
+            logger.error(f"TUI sync failed: {e}", exc_info=True)
             self.notify(f"Sync failed: {e}", severity="error")
             
         finally:
+            logger.info("TUI sync finished, resetting is_syncing flag")
             self.is_syncing = False
+            self._current_sync_task = None
     
     def update_container_status(self):
         containers = self.orchestrator.list_running_containers()
