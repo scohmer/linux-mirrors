@@ -9,8 +9,9 @@ proper package imports when installed via pip.
 
 def main():
     """Entry point for the linux-mirrors CLI command."""
+    import asyncio
     from main import main as main_func
-    return main_func()
+    return asyncio.run(main_func())
 
 if __name__ == "__main__":
     main()
