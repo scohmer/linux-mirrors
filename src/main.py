@@ -7,16 +7,13 @@ import asyncio
 import logging
 from typing import List, Optional
 
-# Add src to Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
-
-from src.config.manager import ConfigManager
-from src.containers.orchestrator import ContainerOrchestrator  
-from src.sync.engines import SyncManager
-from src.systemd.service_generator import SystemdServiceGenerator
-from src.storage.manager import StorageManager
-from src.tui.main_interface import MainInterface
-from src.tui.debug_interface import DebugInterface
+from .config.manager import ConfigManager
+from .containers.orchestrator import ContainerOrchestrator  
+from .sync.engines import SyncManager
+from .systemd.service_generator import SystemdServiceGenerator
+from .storage.manager import StorageManager
+from .tui.main_interface import MainInterface
+from .tui.debug_interface import DebugInterface
 
 def setup_logging(level: str = "INFO"):
     """Configure logging for the application"""
