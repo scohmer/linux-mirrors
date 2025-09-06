@@ -13,6 +13,7 @@ from rich.console import Console
 from config.manager import ConfigManager, DistributionConfig
 from containers.orchestrator import ContainerOrchestrator
 from sync.engines import SyncManager
+from .debug_interface import DebugInterface
 
 class SyncProgress(Static):
     def __init__(self, *args, **kwargs):
@@ -133,6 +134,7 @@ class MainInterface(App):
     
     def on_mount(self):
         self.set_interval(5.0, self.update_container_status)
+        self.install_screen(DebugInterface(), name="debug")
     
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "select-all":
