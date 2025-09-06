@@ -16,6 +16,12 @@ class DistributionConfig:
     architectures: List[str] = None
     enabled: bool = True
     sync_schedule: str = "daily"
+    # Air-gapped environment support
+    include_gpg_keys: bool = True
+    include_installer_images: bool = True
+    include_source_packages: bool = False
+    gpg_key_urls: List[str] = None
+    installer_image_urls: List[str] = None
 
 @dataclass
 class MirrorConfig:
@@ -26,6 +32,13 @@ class MirrorConfig:
     container_runtime: str = "podman"  # 'docker' or 'podman'
     max_concurrent_syncs: int = 3
     log_level: str = "INFO"
+    # Air-gapped environment support
+    nginx_config_path: str = None
+    ssl_cert_path: str = None
+    ssl_key_path: str = None
+    generate_nginx_config: bool = True
+    mirror_hostname: str = "mirror.local"
+    enable_https: bool = False
     
     def __post_init__(self):
         if self.base_path is None:
@@ -40,6 +53,9 @@ class MirrorConfig:
         
         if self.yum_path is None:
             self.yum_path = os.path.join(self.base_path, "yum")
+        
+        if self.nginx_config_path is None:
+            self.nginx_config_path = os.path.join(self.base_path, "nginx")
             
         if self.distributions is None:
             self.distributions = self._get_default_distributions()
@@ -52,7 +68,8 @@ class MirrorConfig:
                 versions=["bullseye", "bookworm", "trixie"],
                 mirror_urls=["http://deb.debian.org/debian/"],
                 components=["main", "contrib", "non-free"],
-                architectures=["amd64", "arm64"]
+                architectures=["amd64", "arm64", "i386", "armhf"],
+                include_source_packages=True
             ),
             "ubuntu": DistributionConfig(
                 name="ubuntu",
@@ -60,7 +77,8 @@ class MirrorConfig:
                 versions=["focal", "jammy", "mantic", "noble"],
                 mirror_urls=["http://archive.ubuntu.com/ubuntu/"],
                 components=["main", "restricted", "universe", "multiverse"],
-                architectures=["amd64", "arm64"]
+                architectures=["amd64", "arm64", "i386", "armhf"],
+                include_source_packages=True
             ),
             "kali": DistributionConfig(
                 name="kali",
@@ -68,7 +86,8 @@ class MirrorConfig:
                 versions=["kali-rolling"],
                 mirror_urls=["http://http.kali.org/kali/"],
                 components=["main", "contrib", "non-free"],
-                architectures=["amd64", "arm64"]
+                architectures=["amd64", "arm64", "i386", "armhf"],
+                include_source_packages=True
             ),
             "rocky": DistributionConfig(
                 name="rocky",

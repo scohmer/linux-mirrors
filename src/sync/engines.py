@@ -133,17 +133,23 @@ class AptSyncEngine(SyncEngine):
             ""
         ]
         
-        # Add repository lines
+        # Add repository lines for each architecture
         for mirror_url in self.dist_config.mirror_urls:
             for arch in self.dist_config.architectures:
                 components = " ".join(self.dist_config.components)
                 repo_line = f"deb-{arch} {mirror_url} {version} {components}"
                 config_lines.append(repo_line)
+            
+            # Add source packages if enabled
+            if getattr(self.dist_config, 'include_source_packages', False):
+                components = " ".join(self.dist_config.components)
+                src_line = f"deb-src {mirror_url} {version} {components}"
+                config_lines.append(src_line)
         
         config_lines.append("")
         config_lines.append("clean http://deb.debian.org/debian")
         
-        return "\\n".join(config_lines)
+        return "\n".join(config_lines)  # Fix: use actual newlines
     
     def validate_config(self) -> bool:
         required_fields = ['mirror_urls', 'components', 'architectures']
