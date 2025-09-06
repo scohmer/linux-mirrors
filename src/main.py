@@ -18,13 +18,21 @@ from tui.debug_interface import DebugInterface
 def setup_logging(level: str = "INFO"):
     """Configure logging for the application"""
     log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    
+    # Determine log file path
+    if os.geteuid() == 0:
+        log_file = "/var/log/linux-mirrors.log"
+    else:
+        log_file = os.path.expanduser("~/.local/log/linux-mirrors.log")
+        # Ensure the log directory exists
+        os.makedirs(os.path.dirname(log_file), exist_ok=True)
+    
     logging.basicConfig(
         level=getattr(logging, level.upper()),
         format=log_format,
         handlers=[
             logging.StreamHandler(sys.stdout),
-            logging.FileHandler("/var/log/linux-mirrors.log") if os.geteuid() == 0 
-            else logging.FileHandler(os.path.expanduser("~/.local/log/linux-mirrors.log"))
+            logging.FileHandler(log_file)
         ]
     )
 
