@@ -56,6 +56,7 @@ class DistributionSelector(Container):
     
     def compose(self) -> ComposeResult:
         yield Static("Select distributions and versions to sync:", classes="section-header")
+        yield Static("Use Tab/Shift+Tab to navigate, Space to toggle checkboxes", id="instructions")
         
         for dist_name, dist_config in self.config.distributions.items():
             if not dist_config.enabled:
@@ -68,6 +69,7 @@ class DistributionSelector(Container):
                 self.checkboxes[dist_name] = {}
                 for version in dist_config.versions:
                     checkbox = Checkbox(f"  {version}", value=False, id=f"{dist_name}-{version}")
+                    checkbox.can_focus = True  # Ensure checkbox can receive focus
                     self.checkboxes[dist_name][version] = checkbox
                     yield checkbox
     
@@ -96,6 +98,14 @@ class MainInterface(App):
     CSS_PATH = "main_interface.css"
     TITLE = "Linux Repository Mirror Manager"
     SUB_TITLE = "Containerized repository synchronization"
+    
+    BINDINGS = [
+        ("ctrl+a", "select_all", "Select All"),
+        ("ctrl+n", "clear_all", "Clear All"),
+        ("ctrl+s", "start_sync", "Start Sync"),
+        ("ctrl+d", "debug_menu", "Debug Menu"),
+        ("ctrl+q", "quit", "Quit"),
+    ]
     
     def __init__(self):
         super().__init__()
@@ -145,6 +155,22 @@ class MainInterface(App):
             self.start_sync_process()
         elif event.button.id == "debug-menu":
             self.push_screen("debug")
+    
+    def action_select_all(self):
+        """Select all distributions via keyboard shortcut"""
+        self.selector.select_all_distributions()
+    
+    def action_clear_all(self):
+        """Clear all selections via keyboard shortcut"""
+        self.selector.clear_all_selections()
+    
+    def action_start_sync(self):
+        """Start sync via keyboard shortcut"""
+        self.start_sync_process()
+    
+    def action_debug_menu(self):
+        """Open debug menu via keyboard shortcut"""
+        self.push_screen("debug")
     
     def start_sync_process(self):
         if self.is_syncing:

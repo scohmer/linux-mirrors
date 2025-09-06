@@ -83,9 +83,22 @@ DataTable > .datatable--odd-row {
     background: $panel;
 }
 
+/* Instructions */
+#instructions {
+    color: $text-muted;
+    text-style: italic;
+    margin-bottom: 1;
+    padding: 0 1;
+}
+
 /* Checkboxes */
 Checkbox {
     margin: 0 0 0 2;
+}
+
+Checkbox:focus {
+    background: $accent 10%;
+    border: thick $accent;
 }
 
 /* Note: Textual doesn't support :checked pseudo-class */
