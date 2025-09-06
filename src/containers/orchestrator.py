@@ -199,8 +199,28 @@ VOLUME ["/mirror"]
                 'finished': inspect_data['State'].get('FinishedAt')
             }
             
-        except (subprocess.CalledProcessError, json.JSONDecodeError, KeyError) as e:
-            logger.error(f"Failed to get status for container {container_id}: {e}")
+        except subprocess.CalledProcessError as e:
+            # Exit code 125 typically means container not found
+            if e.returncode == 125:
+                logger.debug(f"Container {container_id} not found (exit code 125)")
+                return {
+                    'id': container_id[:12],
+                    'name': 'unknown',
+                    'status': 'not found',
+                    'image': 'unknown',
+                    'created': 'unknown',
+                    'started': None,
+                    'finished': None,
+                    'error': 'Container not found'
+                }
+            else:
+                logger.error(f"Failed to inspect container {container_id}: {e.stderr}")
+                return {'error': f"Inspect failed: {e.stderr}"}
+        except (json.JSONDecodeError, KeyError) as e:
+            logger.error(f"Failed to parse container status for {container_id}: {e}")
+            return {'error': f"Parse error: {str(e)}"}
+        except Exception as e:
+            logger.error(f"Unexpected error getting status for container {container_id}: {e}")
             return {'error': str(e)}
     
     def get_container_logs(self, container_id: str, tail: int = 100) -> str:

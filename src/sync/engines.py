@@ -71,6 +71,21 @@ class SyncEngine(ABC):
         while True:
             status = self.orchestrator.get_container_status(self.container_id)
             
+            # Handle container not found (removed externally)
+            if status.get('status') == 'not found' or 'error' in status:
+                if 'not found' in str(status.get('error', '')).lower():
+                    logger.warning(f"Container {self.container_id} was removed externally")
+                    return {
+                        'status': 'failed',
+                        'logs': 'Container was removed before sync completed'
+                    }
+                else:
+                    logger.error(f"Error monitoring container {self.container_id}: {status.get('error')}")
+                    return {
+                        'status': 'failed',
+                        'logs': f"Monitoring error: {status.get('error', 'Unknown error')}"
+                    }
+            
             if status.get('status') == 'exited':
                 # Container finished
                 logs = self.orchestrator.get_container_logs(self.container_id)
