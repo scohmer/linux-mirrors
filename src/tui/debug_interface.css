@@ -1,0 +1,129 @@
+/* Debug Interface CSS */
+
+/* Layout containers */
+#debug-container {
+    width: 100%;
+    height: 100%;
+}
+
+#debug-content {
+    height: 1fr;
+}
+
+#debug-left-panel {
+    width: 1fr;
+    margin: 1;
+}
+
+#debug-right-panel {
+    width: 1fr;
+    margin: 1;
+}
+
+#debug-actions {
+    height: 3;
+    margin: 1 0;
+}
+
+/* Section headers */
+.section-header {
+    color: $accent;
+    text-style: bold;
+    margin: 1 0;
+    padding: 1;
+    background: $panel;
+}
+
+/* Container management */
+#debug-container-table {
+    height: 1fr;
+    margin: 1 0;
+    border: round $secondary;
+    background: $surface;
+}
+
+/* Storage table */
+#storage-table {
+    height: 1fr;
+    margin: 1 0;
+    border: round $secondary;
+    background: $surface;
+}
+
+/* Log viewer */
+#log-content {
+    border: round $secondary;
+    background: $surface;
+    margin: 1 0;
+}
+
+#container-input {
+    width: 1fr;
+    margin: 0 1;
+}
+
+#container-action-input {
+    width: 1fr;
+    margin: 0 1;
+}
+
+/* Button styling */
+Button {
+    margin: 0 1;
+}
+
+Button.default {
+    background: $primary;
+}
+
+Button.warning {
+    background: $warning;
+}
+
+Button.error {
+    background: $error;
+}
+
+/* Tables */
+DataTable {
+    border: round $secondary;
+    background: $surface;
+}
+
+DataTable > .datatable--header {
+    background: $primary;
+    color: $text;
+    text-style: bold;
+}
+
+DataTable > .datatable--odd-row {
+    background: $panel;
+}
+
+/* Text areas */
+TextArea {
+    border: round $secondary;
+    background: $surface;
+}
+
+TextArea:focus {
+    border: round $accent;
+}
+
+/* Input fields */
+Input {
+    border: round $secondary;
+    background: $surface;
+}
+
+Input:focus {
+    border: round $accent;
+}
+
+/* Status indicators */
+#storage-summary {
+    margin: 1 0;
+    padding: 1;
+    background: $panel;
+    border: round $secondary;
+}

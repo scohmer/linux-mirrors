@@ -19,15 +19,28 @@ class DistributionConfig:
 
 @dataclass
 class MirrorConfig:
-    base_path: str = "/srv/mirror"
-    apt_path: str = "/srv/mirror/apt"
-    yum_path: str = "/srv/mirror/yum"
+    base_path: str = None
+    apt_path: str = None
+    yum_path: str = None
     distributions: Dict[str, DistributionConfig] = None
     container_runtime: str = "docker"  # 'docker' or 'podman'
     max_concurrent_syncs: int = 3
     log_level: str = "INFO"
     
     def __post_init__(self):
+        if self.base_path is None:
+            # Use user-accessible paths when not running as root
+            if os.geteuid() == 0:
+                self.base_path = "/srv/mirror"
+            else:
+                self.base_path = os.path.expanduser("~/mirrors")
+        
+        if self.apt_path is None:
+            self.apt_path = os.path.join(self.base_path, "apt")
+        
+        if self.yum_path is None:
+            self.yum_path = os.path.join(self.base_path, "yum")
+            
         if self.distributions is None:
             self.distributions = self._get_default_distributions()
     
