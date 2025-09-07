@@ -129,12 +129,6 @@ class MainInterface(App):
                 with Vertical(id="left-panel"):
                     self.selector = DistributionSelector(self.config_manager)
                     yield self.selector
-                    
-                    with Horizontal(id="button-row"):
-                        yield Button("Select All", id="select-all", variant="default")
-                        yield Button("Clear All", id="clear-all", variant="default") 
-                        yield Button("Start Sync", id="start-sync", variant="primary")
-                        yield Button("Debug Menu", id="debug-menu", variant="warning")
                 
                 with Vertical(id="right-panel"):
                     yield Static("Sync Progress", classes="section-header")
@@ -145,6 +139,13 @@ class MainInterface(App):
                     self.container_table = DataTable(id="container-table")
                     self.container_table.add_columns("Container", "Status", "Image")
                     yield self.container_table
+                    
+                    yield Static("Actions", classes="section-header")
+                    with Horizontal(id="button-row"):
+                        yield Button("Select All", id="select-all", variant="default")
+                        yield Button("Clear All", id="clear-all", variant="default") 
+                        yield Button("Start Sync", id="start-sync", variant="primary")
+                        yield Button("Debug Menu", id="debug-menu", variant="warning")
         
         yield Footer()
     
