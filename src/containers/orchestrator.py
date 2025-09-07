@@ -127,6 +127,14 @@ VOLUME ["/mirror"]
         # Ensure the mirror directory exists with proper permissions
         os.makedirs(mirror_path, mode=0o755, exist_ok=True)
         
+        # Set proper ownership and permissions for the mirror directory
+        try:
+            # Make directory writable by everyone to avoid container permission issues
+            os.chmod(mirror_path, 0o777)
+            logger.info(f"Set permissions 777 on {mirror_path}")
+        except Exception as e:
+            logger.warning(f"Failed to set permissions on {mirror_path}: {e}")
+        
         try:
             # Remove existing container if it exists
             try:
@@ -140,8 +148,9 @@ VOLUME ["/mirror"]
             create_cmd = [
                 self.container_runtime, 'create',
                 '--name', container_name,
-                '--volume', f"{mirror_path}:/mirror:rw,Z",  # Add SELinux context
+                '--volume', f"{mirror_path}:/mirror:rw,z",  # Use lowercase 'z' for shared SELinux label
                 '--userns=keep-id',  # Keep host UID/GID mapping
+                '--security-opt', 'label=disable',  # Disable SELinux isolation for testing
                 '--env', f'DIST_NAME={dist_name}',
                 '--env', f'DIST_VERSION={version}',
                 '--env', 'MIRROR_PATH=/mirror',

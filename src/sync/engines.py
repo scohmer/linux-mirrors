@@ -199,10 +199,10 @@ class YumSyncEngine(SyncEngine):
         # Create temporary sync directory
         mkdir_commands.append("mkdir -p /tmp/sync")
         
-        # Create directories for all repositories and architectures
+        # Create directories for all repositories and architectures with proper permissions
         for arch in supported_archs:
             for repo_id, repo_info in repositories.items():
-                mkdir_commands.append(f"mkdir -p /mirror/{version}/{repo_info['path']}/{arch}/os")
+                mkdir_commands.append(f"mkdir -p /mirror/{version}/{repo_info['path']}/{arch}/os && chmod -R 777 /mirror/{version}/{repo_info['path']}/{arch}")
         
         # Generate sync commands for all repositories
         for arch in supported_archs:
@@ -211,8 +211,28 @@ class YumSyncEngine(SyncEngine):
                     repo_path = f"/mirror/{version}/{repo_info['path']}/{arch}/os"
                     repo_tmp = f"/tmp/sync/{repo_name}-{repo_id}-{arch}"
                     
-                    # Sync command with error handling
-                    cmd = f"dnf reposync --config={config_file} --repoid={repo_name}-{repo_id}-{arch} --arch={arch} -p /tmp/sync --download-metadata && [ -d {repo_tmp} ] && [ -n \"$(ls -A {repo_tmp} 2>/dev/null)\" ] && mv {repo_tmp}/* {repo_path}/ && rm -rf {repo_tmp}"
+                    # Sync command with enhanced error handling and debugging
+                    cmd = f"""
+                    echo "Starting sync for {repo_id} {arch}..." &&
+                    dnf reposync --config={config_file} --repoid={repo_name}-{repo_id}-{arch} --arch={arch} -p /tmp/sync --download-metadata --verbose 2>&1 &&
+                    echo "Sync completed, checking results..." &&
+                    ls -la /tmp/sync/ &&
+                    if [ -d {repo_tmp} ]; then
+                        echo "Found sync directory {repo_tmp}" &&
+                        ls -la {repo_tmp}/ &&
+                        if [ -n "$(ls -A {repo_tmp} 2>/dev/null)" ]; then
+                            echo "Moving files to {repo_path}..." &&
+                            mv {repo_tmp}/* {repo_path}/ &&
+                            rm -rf {repo_tmp} &&
+                            echo "Successfully synced {repo_id} {arch}"
+                        else
+                            echo "No files in {repo_tmp}, cleaning up..." &&
+                            rm -rf {repo_tmp}
+                        fi
+                    else
+                        echo "Sync directory {repo_tmp} not found, may have failed"
+                    fi
+                    """.strip()
                     commands.append(cmd)
                     
                     # Create repository metadata (only if directory has content)
@@ -301,8 +321,8 @@ class YumSyncEngine(SyncEngine):
         
         iso_commands = []
         
-        # Create ISO directory
-        iso_commands.append("mkdir -p /mirror/isos")
+        # Create ISO directory with proper permissions
+        iso_commands.append("mkdir -p /mirror/isos && chmod 777 /mirror/isos")
         
         for mirror_url in self.dist_config.mirror_urls:
             for arch in supported_archs:
