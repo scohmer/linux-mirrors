@@ -86,9 +86,16 @@
 
 /* Container action row */
 .container-actions {
-    height: 5;
+    height: 4;
     margin: 1 0;
-    padding: 1;
+    padding: 0;
+}
+
+/* Container control buttons row */
+.container-controls {
+    height: 4;
+    margin: 1 0;
+    padding: 0;
 }
 
 /* Modern button styling with consistent design */

@@ -95,23 +95,26 @@ class ContainerManager(Container):
         self.orchestrator = orchestrator
     
     def compose(self) -> ComposeResult:
+        # [LABEL]
         yield Static("Container Management", classes="section-header")
         
-        with Horizontal():
-            yield Button("Refresh", id="refresh-containers", variant="default")
-            yield Button("Cleanup Stopped", id="cleanup-containers", variant="warning")
-            yield Button("Stop All", id="stop-all", variant="error")
-        
+        # [LIST OF CONTAINERS RUNNING/EXITED]
         self.container_table = DataTable(id="debug-container-table")
         self.container_table.add_columns("ID", "Name", "Status", "Image", "Created")
         yield self.container_table
         
+        # [INPUT DROPDOWN TO SELECT A CONTAINER] [STOP BUTTON] [INSPECT BUTTON]
         with Horizontal(classes="container-actions"):
-            # Initialize with empty options, will populate on mount
             self.action_select = Select[str]([], allow_blank=True, id="container-action-select")
             yield self.action_select
             yield Button("Stop", id="stop-container", variant="warning")
             yield Button("Inspect", id="inspect-container", variant="default")
+        
+        # [REFRESH][Cleanup Stopped][Stop All]
+        with Horizontal(classes="container-controls"):
+            yield Button("Refresh", id="refresh-containers", variant="default")
+            yield Button("Cleanup Stopped", id="cleanup-containers", variant="warning")
+            yield Button("Stop All", id="stop-all", variant="error")
     
     def on_mount(self):
         self.refresh_containers()
