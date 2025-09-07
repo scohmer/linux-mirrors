@@ -82,11 +82,13 @@
     width: 1fr;
     margin: 0 1;
     height: 5;
+    background: transparent;
+    border: none;
 }
 
 /* Container action row */
 .container-actions {
-    height: 10;
+    height: 14;
     margin: 1 0;
     padding: 2;
     background: $panel 20%;
@@ -198,7 +200,7 @@ Input:focus {
     background: $surface;
 }
 
-/* Select widgets styling */
+/* General Select widgets styling */
 Select {
     border: round $panel;
     background: $surface;
@@ -208,6 +210,12 @@ Select {
 Select:focus {
     border: round $accent;
     background: $surface;
+}
+
+/* Override for container action select - no styling */
+.container-actions Select {
+    border: none;
+    background: transparent;
 }
 
 /* Status indicators */
