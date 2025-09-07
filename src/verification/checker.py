@@ -280,6 +280,35 @@ class RepositoryVerifier:
                 direct_path = os.path.join(base_path, url_parts)
                 mirror_paths.append(direct_path)
             
+            # For Debian, handle archive.debian.org vs deb.debian.org paths
+            if dist_name == 'debian':
+                # Debian versions that use archive.debian.org (versions < 11)
+                archive_versions = ['wheezy', 'jessie', 'stretch', 'buster']
+                
+                if version in archive_versions:
+                    # For archive versions, check archive.debian.org paths first
+                    archive_mirror_path = os.path.join(base_path, 'mirror', 'archive.debian.org', 'debian')
+                    archive_direct_path = os.path.join(base_path, 'archive.debian.org', 'debian')
+                    
+                    # Insert at beginning to prioritize archive paths for older versions
+                    mirror_paths.insert(0, archive_mirror_path)
+                    mirror_paths.insert(1, archive_direct_path)
+                    
+                    logger.debug(f"Archive Debian version {version} - prioritizing archive.debian.org paths")
+                
+                else:
+                    # For current versions (>= 11), check deb.debian.org paths first
+                    deb_mirror_path = os.path.join(base_path, 'mirror', 'deb.debian.org', 'debian')
+                    deb_direct_path = os.path.join(base_path, 'deb.debian.org', 'debian')
+                    
+                    # Only add if not already in the list from mirror_urls processing
+                    if deb_mirror_path not in mirror_paths:
+                        mirror_paths.insert(0, deb_mirror_path)
+                    if deb_direct_path not in mirror_paths:
+                        mirror_paths.insert(1, deb_direct_path)
+                    
+                    logger.debug(f"Current Debian version {version} - prioritizing deb.debian.org paths")
+            
             # Also check the base path itself (in case it's structured differently)
             mirror_paths.append(base_path)
             
