@@ -45,7 +45,6 @@
     padding: 2;
     border: round $panel;
     background: $panel;
-    box-shadow: 0 1 3 rgba(0,0,0,0.1);
 }
 
 .dist-title {

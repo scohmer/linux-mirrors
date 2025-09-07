@@ -153,7 +153,6 @@ TextArea {
 TextArea:focus {
     border: round $accent;
     background: $surface;
-    box-shadow: 0 0 3 $accent 20%;
 }
 
 /* Modern input fields with improved focus states */
@@ -166,7 +165,6 @@ Input {
 Input:focus {
     border: round $accent;
     background: $surface;
-    box-shadow: 0 0 2 $accent 15%;
 }
 
 /* Select widgets styling */
@@ -179,7 +177,6 @@ Select {
 Select:focus {
     border: round $accent;
     background: $surface;
-    box-shadow: 0 0 2 $accent 15%;
 }
 
 /* Modern status indicators with card design */
