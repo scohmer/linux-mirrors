@@ -32,8 +32,8 @@
 }
 
 #debug-actions {
-    height: 4;
-    margin: 1 0 0 0;
+    height: 6;
+    margin: 0;
     padding: 1;
     background: $panel 30%;
     border: round $panel;
@@ -186,10 +186,11 @@ Select:focus {
     background: $surface;
 }
 
-/* Modern status indicators with muted card design */
+/* Compact status indicators */
 #storage-summary {
-    margin: 2 0;
-    padding: 2;
+    margin: 0 0 1 0;
+    padding: 1;
+    height: 3;
     background: $panel 40%;
     border: round $panel;
     border-left: thick $primary 50%;
