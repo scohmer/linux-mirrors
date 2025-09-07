@@ -205,16 +205,16 @@ def cmd_setup_systemd(args, config_manager: ConfigManager):
         for service in created_services:
             print(f"  - {service['service_name']} ({service['distribution']} {service['version']})")
         
-        print(f"\\nService files written to: {'~/.config/systemd/user' if args.user else '/etc/systemd/system'}")
+        print(f"\nService files written to: {'~/.config/systemd/user' if args.user else '/etc/systemd/system'}")
         
         if not args.user:
-            print("\\nTo enable and start services, run:")
+            print("\nTo enable and start services, run:")
             print("  sudo systemctl daemon-reload")
             for service in created_services:
                 if service.get('timer_file'):
                     print(f"  sudo systemctl enable --now {service['service_name']}.timer")
         else:
-            print("\\nTo enable and start services, run:")
+            print("\nTo enable and start services, run:")
             print("  systemctl --user daemon-reload")
             for service in created_services:
                 if service.get('timer_file'):
@@ -236,12 +236,12 @@ def cmd_status(args, orchestrator: ContainerOrchestrator, storage_manager: Stora
         
         verification_results = verifier.verify_all_repositories()
         summary = verifier.get_verification_summary(verification_results)
-        print(f"\\n{summary}")
+        print(f"\n{summary}")
         
         # Show verified repositories first
         verified_repos = [d for d in verification_results['details'] if d['status'] == 'verified']
         if verified_repos:
-            print("\\nVerified repositories:")
+            print("\nVerified repositories:")
             for detail in verified_repos:
                 print(f"  ✓ {detail['distribution']} {detail['version']}: File integrity verified against origin repository")
         
@@ -250,24 +250,24 @@ def cmd_status(args, orchestrator: ContainerOrchestrator, storage_manager: Stora
         for detail in verification_results['details']:
             if detail['status'] in ['failed', 'missing']:
                 if not issues_found:
-                    print("\\nIssues found:")
+                    print("\nIssues found:")
                     issues_found = True
                 status_symbol = "✗" if detail['status'] == 'failed' else "?"
                 print(f"  {status_symbol} {detail['distribution']} {detail['version']}: {detail['details']}")
         
         if not issues_found and not verified_repos:
-            print("\\nNo repositories found or all repositories have issues")
+            print("\nNo repositories found or all repositories have issues")
         
         # Show verification statistics
         if verification_results['total_repos'] > 0:
-            print(f"\\nVerification stats:")
+            print(f"\nVerification stats:")
             print(f"  Files checked: {sum(d['files_checked'] for d in verification_results['details'])}")
             print(f"  Files missing: {sum(d['files_missing'] for d in verification_results['details'])}")
             print(f"  Files corrupted: {sum(d['files_corrupted'] for d in verification_results['details'])}")
     
     else:
         # Standard system status mode
-        print("=== Linux Mirror System Status ===\\n")
+        print("=== Linux Mirror System Status ===\n")
         
         # Container status
         containers = orchestrator.list_running_containers()
@@ -296,7 +296,7 @@ def cmd_storage(args, storage_manager: StorageManager):
         print(f"Total repositories: {storage_info['total_repos']}")
         
         for path_info in storage_info['paths']:
-            print(f"\\nPath: {path_info['path']}")
+            print(f"\nPath: {path_info['path']}")
             print(f"  Type: {path_info.get('type', 'unknown')}")
             print(f"  Total size: {path_info.get('total_size', 0) / (1024**3):.1f} GB")
             print(f"  Used: {path_info.get('used_percent', 0):.1f}%")

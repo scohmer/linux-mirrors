@@ -25,7 +25,7 @@ class SystemdServiceGenerator:
             working_directory = os.path.expanduser("~/mirrors")
         else:
             exec_start_pre = "ExecStartPre=/usr/bin/mkdir -p /srv/mirror"
-            user_directive = "User=mirror\\nGroup=mirror"
+            user_directive = "User=mirror\nGroup=mirror"
             working_directory = "/srv/mirror"
         
         # Generate the main sync command
@@ -199,7 +199,7 @@ WantedBy=timers.target
             user_directive = ""
         else:
             working_directory = "/srv/mirror"
-            user_directive = "User=mirror\\nGroup=mirror"
+            user_directive = "User=mirror\nGroup=mirror"
         
         sync_command = f"/usr/bin/python3 /usr/local/bin/linux-mirrors sync --all --non-interactive"
         

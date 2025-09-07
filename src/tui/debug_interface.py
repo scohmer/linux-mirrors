@@ -254,7 +254,7 @@ class ContainerManager(Container):
                 f"Finished: {status.get('finished', 'N/A')}"
             ]
             
-            self.notify("\\n".join(info_lines), severity="info")
+            self.notify("\n".join(info_lines), severity="info")
             
         except Exception as e:
             self.notify(f"Failed to inspect container: {e}", severity="error")
@@ -318,7 +318,7 @@ class DebugInterface(Screen):
                 f"Disk Usage: {psutil.disk_usage('/').percent}%"
             ]
             
-            self.notify("\\n".join(info_lines), severity="info")
+            self.notify("\n".join(info_lines), severity="info")
             
         except Exception as e:
             self.notify(f"Failed to get system info: {e}", severity="error")
