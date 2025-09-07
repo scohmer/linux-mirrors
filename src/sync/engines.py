@@ -596,24 +596,28 @@ class SyncManager:
                 else:
                     yum_distributions[dist_name] = versions
         
-        # Run APT distributions sequentially (one at a time)
-        logger.info(f"Syncing APT distributions sequentially: {list(apt_distributions.keys())}")
-        for dist_name, versions in apt_distributions.items():
-            dist_config = self.orchestrator.config_manager.get_config().distributions[dist_name]
-            logger.info(f"Starting APT sync for {dist_name}")
-            results = await self.sync_distribution(dist_config, versions)
-            all_results.extend(results)
-            logger.info(f"Completed APT sync for {dist_name}")
-        
-        # Run YUM distributions in parallel
+        # Start YUM distributions in parallel immediately (don't wait for APT)
+        yum_tasks = []
         if yum_distributions:
-            logger.info(f"Syncing YUM distributions in parallel: {list(yum_distributions.keys())}")
-            yum_tasks = []
+            logger.info(f"Starting YUM distributions in parallel: {list(yum_distributions.keys())}")
             for dist_name, versions in yum_distributions.items():
                 dist_config = self.orchestrator.config_manager.get_config().distributions[dist_name]
                 task = self.sync_distribution(dist_config, versions)
                 yum_tasks.append(task)
-            
+        
+        # Run APT distributions sequentially (one at a time) while YUM runs in parallel
+        if apt_distributions:
+            logger.info(f"Starting APT distributions sequentially: {list(apt_distributions.keys())}")
+            for dist_name, versions in apt_distributions.items():
+                dist_config = self.orchestrator.config_manager.get_config().distributions[dist_name]
+                logger.info(f"Starting APT sync for {dist_name}")
+                results = await self.sync_distribution(dist_config, versions)
+                all_results.extend(results)
+                logger.info(f"Completed APT sync for {dist_name}")
+        
+        # Wait for all YUM distributions to complete
+        if yum_tasks:
+            logger.info("Waiting for YUM distributions to complete...")
             yum_results = await asyncio.gather(*yum_tasks, return_exceptions=True)
             for result_list in yum_results:
                 if isinstance(result_list, Exception):
