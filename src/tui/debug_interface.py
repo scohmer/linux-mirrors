@@ -5,7 +5,7 @@ import logging
 from typing import Dict, List, Optional, Any
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal, Vertical
-from textual.widgets import Header, Footer, Static, Button, Log, DataTable, Input, TextArea
+from textual.widgets import Header, Footer, Static, Button, Log, DataTable, Input, TextArea, Select
 from textual.reactive import reactive
 from textual.screen import Screen
 
@@ -25,22 +25,49 @@ class LogViewer(Container):
         yield Static("Container Logs", classes="section-header")
         
         with Horizontal():
-            yield Input(placeholder="Container ID or name", id="container-input")
+            # Initialize with empty options, will populate on mount
+            self.container_select = Select[str]([], allow_blank=True, id="container-select")
+            self.container_select.styles.width = "50%"
+            yield self.container_select
             yield Button("View Logs", id="view-logs", variant="primary")
             yield Button("Clear", id="clear-logs", variant="default")
+            yield Button("Refresh", id="refresh-containers", variant="default")
         
         self.log_display = TextArea("", read_only=True, id="log-content")
         self.log_display.styles.height = "80%"
         yield self.log_display
     
+    def on_mount(self):
+        self.refresh_container_list()
+    
     def on_button_pressed(self, event: Button.Pressed):
         if event.button.id == "view-logs":
-            container_input = self.query_one("#container-input", Input)
-            container_id = container_input.value.strip()
-            if container_id:
-                self.load_container_logs(container_id)
+            if self.container_select.value != Select.BLANK:
+                self.load_container_logs(self.container_select.value)
         elif event.button.id == "clear-logs":
             self.log_display.text = ""
+        elif event.button.id == "refresh-containers":
+            self.refresh_container_list()
+    
+    def refresh_container_list(self):
+        """Refresh the container dropdown list"""
+        try:
+            containers = self.orchestrator.list_running_containers()
+            
+            # Create options list with (display_name, container_id) tuples
+            options = []
+            for container in containers:
+                display_name = f"{container['name']} ({container['id'][:12]}...)"
+                options.append((display_name, container['id']))
+            
+            # Update the select widget
+            self.container_select.set_options(options)
+            
+            if not options:
+                self.log_display.text = "No containers found. Start a sync to see containers here."
+            
+        except Exception as e:
+            self.log_display.text = f"Error loading containers: {e}"
     
     def load_container_logs(self, container_id: str):
         try:
@@ -68,7 +95,10 @@ class ContainerManager(Container):
         yield self.container_table
         
         with Horizontal():
-            yield Input(placeholder="Container ID", id="container-action-input")
+            # Initialize with empty options, will populate on mount
+            self.action_select = Select[str]([], allow_blank=True, id="container-action-select")
+            self.action_select.styles.width = "50%"
+            yield self.action_select
             yield Button("Stop", id="stop-container", variant="warning")
             yield Button("Inspect", id="inspect-container", variant="default")
     
@@ -94,6 +124,9 @@ class ContainerManager(Container):
             # Clear and repopulate table
             self.container_table.clear()
             
+            # Create options for the action dropdown
+            options = []
+            
             for container in containers:
                 self.container_table.add_row(
                     container['id'],
@@ -102,6 +135,13 @@ class ContainerManager(Container):
                     container['image'],
                     container.get('created', 'N/A')[:19] if container.get('created') else 'N/A'
                 )
+                
+                # Add to dropdown options
+                display_name = f"{container['name']} ({container['id'][:12]}...)"
+                options.append((display_name, container['id']))
+            
+            # Update the action select dropdown
+            self.action_select.set_options(options)
             
             self.notify(f"Refreshed {len(containers)} containers")
             
@@ -164,27 +204,25 @@ class ContainerManager(Container):
             self.notify(f"Failed to stop containers: {e}", severity="error")
     
     def stop_selected_container(self):
-        container_input = self.query_one("#container-action-input", Input)
-        container_id = container_input.value.strip()
-        
-        if not container_id:
-            self.notify("Please enter a container ID", severity="error")
+        if self.action_select.value == Select.BLANK:
+            self.notify("Please select a container", severity="error")
             return
+        
+        container_id = self.action_select.value
         
         try:
             self.orchestrator.stop_container(container_id)
-            self.notify(f"Stopped container {container_id}", severity="success")
+            self.notify(f"Stopped container {container_id[:12]}...", severity="success")
             self.refresh_containers()
         except Exception as e:
             self.notify(f"Failed to stop container: {e}", severity="error")
     
     def inspect_selected_container(self):
-        container_input = self.query_one("#container-action-input", Input)
-        container_id = container_input.value.strip()
-        
-        if not container_id:
-            self.notify("Please enter a container ID", severity="error")
+        if self.action_select.value == Select.BLANK:
+            self.notify("Please select a container", severity="error")
             return
+        
+        container_id = self.action_select.value
         
         try:
             status = self.orchestrator.get_container_status(container_id)
