@@ -81,16 +81,16 @@
 #container-action-select {
     width: 1fr;
     margin: 0 1;
-    min-height: 3;
+    height: 5;
     background: $surface;
     border: round $panel;
 }
 
 /* Container action row */
 .container-actions {
-    height: 5;
+    height: 10;
     margin: 1 0;
-    padding: 1;
+    padding: 2;
     background: $panel 20%;
     border: round $panel;
 }
