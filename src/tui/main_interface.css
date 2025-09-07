@@ -118,8 +118,6 @@ Button.error {
 
 #sync-progress:empty {
     height: 8;
-    content: "No sync in progress";
-    color: $text-muted;
 }
 
 /* Container table */

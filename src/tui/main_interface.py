@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 class SyncProgress(Static):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__("No sync in progress", *args, **kwargs)
         self.progress_data: Dict[str, Dict[str, Any]] = {}
     
     def update_progress(self, dist_name: str, version: str, status: str, details: str = ""):
