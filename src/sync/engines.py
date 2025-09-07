@@ -169,15 +169,20 @@ class YumSyncEngine(SyncEngine):
         
         # Create reposync command for each architecture using the config file
         commands = []
+        # First, create necessary directories
+        mkdir_commands = []
+        for arch in self.dist_config.architectures:
+            mkdir_commands.append(f"mkdir -p /mirror/{arch}")
+        
         for arch in self.dist_config.architectures:
             for mirror_url in self.dist_config.mirror_urls:
                 # Use --config option to specify our repo file location
                 # Note: using -p for --download-path and correct argument names
-                cmd = f"dnf reposync --config={config_file} --repoid={repo_name}-baseos-{arch} --arch={arch} -p /mirror/{arch} --download-metadata"
+                cmd = f"dnf reposync --config={config_file} --repoid={repo_name}-baseos-{arch} --arch={arch} -p /mirror --download-metadata"
                 commands.append(cmd)
                 
                 # Add AppStream repository
-                appstream_cmd = f"dnf reposync --config={config_file} --repoid={repo_name}-appstream-{arch} --arch={arch} -p /mirror/{arch} --download-metadata"
+                appstream_cmd = f"dnf reposync --config={config_file} --repoid={repo_name}-appstream-{arch} --arch={arch} -p /mirror --download-metadata"
                 commands.append(appstream_cmd)
         
         # Escape the repo config for shell
@@ -185,6 +190,7 @@ class YumSyncEngine(SyncEngine):
         
         full_command = f'''
         echo -e "{escaped_config}" > {config_file} &&
+        {' && '.join(mkdir_commands)} &&
         {' && '.join(commands)} &&
         createrepo_c /mirror/
         '''
