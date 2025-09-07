@@ -225,8 +225,8 @@ class YumSyncEngine(SyncEngine):
             if version == "8":
                 # Rocky/RHEL 8 only supports x86_64 and aarch64
                 return [arch for arch in all_archs if arch in ["x86_64", "aarch64"]]
-            elif version == "9":
-                # Rocky/RHEL 9 supports all listed architectures
+            elif version in ["9", "10"]:
+                # Rocky/RHEL 9 and 10 support all listed architectures
                 return all_archs
         
         # For other distributions, return all architectures

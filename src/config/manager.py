@@ -65,7 +65,7 @@ class MirrorConfig:
             "debian": DistributionConfig(
                 name="debian",
                 type="apt",
-                versions=["bullseye", "bookworm", "trixie"],
+                versions=["wheezy", "jessie", "stretch", "buster", "bullseye", "bookworm", "trixie"],
                 mirror_urls=["http://deb.debian.org/debian/"],
                 components=["main", "contrib", "non-free"],
                 architectures=["amd64", "arm64", "i386", "armhf"],
@@ -74,7 +74,7 @@ class MirrorConfig:
             "ubuntu": DistributionConfig(
                 name="ubuntu",
                 type="apt",
-                versions=["focal", "jammy", "mantic", "noble"],
+                versions=["bionic", "focal", "jammy", "mantic", "noble", "oracular"],
                 mirror_urls=["http://archive.ubuntu.com/ubuntu/"],
                 components=["main", "restricted", "universe", "multiverse"],
                 architectures=["amd64", "arm64", "i386", "armhf"],
@@ -92,17 +92,17 @@ class MirrorConfig:
             "rocky": DistributionConfig(
                 name="rocky",
                 type="yum",
-                versions=["8", "9"],
+                versions=["8", "9", "10"],
                 mirror_urls=["https://dl.rockylinux.org/pub/rocky/"],
                 architectures=["x86_64", "aarch64", "ppc64le", "s390x"]
             ),
             "rhel": DistributionConfig(
                 name="rhel",
                 type="yum",
-                versions=["8", "9"],
+                versions=["8", "9", "10"],
                 mirror_urls=["https://cdn.redhat.com/content/dist/rhel/"],
                 architectures=["x86_64", "aarch64", "ppc64le", "s390x"],
-                enabled=False  # Requires subscription
+                enabled=True  # Enable RHEL in TUI (requires subscription)
             )
         }
 
