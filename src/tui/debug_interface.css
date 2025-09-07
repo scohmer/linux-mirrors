@@ -1,23 +1,31 @@
-/* Debug Interface CSS */
+/* Debug Interface CSS - Modern Clean Design */
 
-/* Layout containers */
+/* Layout containers with improved spacing */
 #debug-container {
     width: 100%;
     height: 100%;
+    background: $surface;
 }
 
 #debug-content {
     height: 1fr;
+    padding: 0 1;
 }
 
 #debug-left-panel {
     width: 1fr;
-    margin: 1;
+    margin: 0 1 0 0;
+    padding: 1;
+    background: $surface;
+    border: round $panel;
 }
 
 #debug-right-panel {
     width: 1fr;
-    margin: 1;
+    margin: 0 0 0 1;
+    padding: 1;
+    background: $surface;
+    border: round $panel;
 }
 
 #debug-actions {
@@ -25,13 +33,15 @@
     margin: 1 0;
 }
 
-/* Section headers */
+/* Modern section headers with gradient-like effect */
 .section-header {
-    color: $accent;
+    color: $primary;
     text-style: bold;
-    margin: 1 0;
-    padding: 1;
-    background: $panel;
+    margin: 0 0 1 0;
+    padding: 1 2;
+    background: $accent 10%;
+    border-left: thick $accent;
+    border-bottom: hkey $panel;
 }
 
 /* Container management */
@@ -67,63 +77,123 @@
     margin: 0 1;
 }
 
-/* Button styling */
+/* Modern button styling with consistent design */
 Button {
     margin: 0 1;
+    min-width: 10;
+    border: round $primary;
+    text-style: bold;
+}
+
+Button:hover {
+    background: $accent 20%;
+    border: round $accent;
 }
 
 Button.default {
     background: $primary;
+    color: $text;
+}
+
+Button.primary {
+    background: $accent;
+    color: $text;
+}
+
+Button.success {
+    background: $success;
+    color: $text;
 }
 
 Button.warning {
     background: $warning;
+    color: $text;
 }
 
 Button.error {
     background: $error;
+    color: $text;
 }
 
-/* Tables */
+/* Modern tables with better visual hierarchy */
 DataTable {
-    border: round $secondary;
+    border: round $panel;
     background: $surface;
+    margin: 1 0;
 }
 
 DataTable > .datatable--header {
-    background: $primary;
+    background: $accent 15%;
     color: $text;
     text-style: bold;
+    border-bottom: hkey $primary;
 }
 
 DataTable > .datatable--odd-row {
-    background: $panel;
+    background: $panel 50%;
 }
 
-/* Text areas */
-TextArea {
-    border: round $secondary;
+DataTable > .datatable--even-row {
     background: $surface;
+}
+
+DataTable > .datatable--cursor {
+    background: $accent 25%;
+    color: $text;
+}
+
+/* Modern text areas with subtle shadows */
+TextArea {
+    border: round $panel;
+    background: $surface;
+    margin: 1 0;
+    padding: 1;
 }
 
 TextArea:focus {
     border: round $accent;
+    background: $surface;
+    box-shadow: 0 0 3 $accent 20%;
 }
 
-/* Input fields */
+/* Modern input fields with improved focus states */
 Input {
-    border: round $secondary;
+    border: round $panel;
     background: $surface;
+    padding: 1;
 }
 
 Input:focus {
     border: round $accent;
+    background: $surface;
+    box-shadow: 0 0 2 $accent 15%;
 }
 
-/* Status indicators */
-#storage-summary {
-    margin: 1 0;
+/* Select widgets styling */
+Select {
+    border: round $panel;
+    background: $surface;
     padding: 1;
-    background: $panel;
-    border: round $secondary;
+}
+
+Select:focus {
+    border: round $accent;
+    background: $surface;
+    box-shadow: 0 0 2 $accent 15%;
+}
+
+/* Modern status indicators with card design */
+#storage-summary {
+    margin: 2 0;
+    padding: 2;
+    background: $panel 70%;
+    border: round $panel;
+    border-left: thick $success;
+}
+
+/* Action panels with modern styling */
+#debug-actions {
+    background: $panel 20%;
+    border: round $panel;
+    padding: 1;
 }

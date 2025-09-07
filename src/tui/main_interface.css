@@ -1,70 +1,120 @@
-/* Main Interface CSS */
+/* Main Interface CSS - Modern Clean Design */
 
-/* Layout containers */
+/* Layout containers with improved spacing */
 #main-container {
     width: 100%;
     height: 100%;
+    background: $surface;
 }
 
 #content-area {
     height: 1fr;
+    padding: 0 1;
 }
 
 #left-panel {
     width: 1fr;
-    margin: 1;
+    margin: 0 1 0 0;
+    padding: 1;
+    background: $surface;
+    border: round $panel;
 }
 
 #right-panel {
     width: 1fr;
-    margin: 1;
-}
-
-/* Section headers */
-.section-header {
-    color: $accent;
-    text-style: bold;
-    margin: 1 0;
+    margin: 0 0 0 1;
     padding: 1;
-    background: $panel;
-}
-
-/* Distribution selector */
-.distribution-container {
-    margin: 1 0;
-    padding: 1;
-    border: round $primary;
     background: $surface;
+    border: round $panel;
+}
+
+/* Modern section headers with subtle styling */
+.section-header {
+    color: $primary;
+    text-style: bold;
+    margin: 0 0 1 0;
+    padding: 1 2;
+    background: $accent 10%;
+    border-left: thick $accent;
+    border-bottom: hkey $panel;
+}
+
+/* Modern distribution selector with card-like design */
+.distribution-container {
+    margin: 0 0 2 0;
+    padding: 2;
+    border: round $panel;
+    background: $panel;
+    box-shadow: 0 1 3 rgba(0,0,0,0.1);
 }
 
 .dist-title {
     text-style: bold;
-    color: $primary;
+    color: $accent;
     margin-bottom: 1;
+    padding-bottom: 1;
+    border-bottom: hkey $primary 20%;
 }
 
 .version-row {
     height: auto;
-    margin-bottom: 1;
+    margin: 1 0;
+    padding: 0 1;
 }
 
-/* Button styling */
+/* Modern button styling with improved spacing */
 #button-row {
-    margin: 1 0;
-    height: 3;
+    margin: 2 0;
+    height: 4;
+    padding: 1;
+    background: $panel 30%;
+    border: round $secondary;
 }
 
 Button {
     margin: 0 1;
+    min-width: 12;
+    border: round $primary;
+    text-style: bold;
 }
 
-/* Progress display */
+Button:hover {
+    background: $accent 20%;
+    border: round $accent;
+}
+
+Button.primary {
+    background: $primary;
+    color: $text;
+}
+
+Button.success {
+    background: $success;
+    color: $text;
+}
+
+Button.warning {
+    background: $warning;
+    color: $text;
+}
+
+Button.error {
+    background: $error;
+    color: $text;
+}
+
+/* Modern progress display with better visual hierarchy */
 #sync-progress {
     height: 1fr;
-    border: round $secondary;
-    padding: 1;
+    border: round $panel;
+    padding: 2;
     background: $surface;
-    margin: 1 0;
+    margin: 2 0;
+    border-left: thick $accent;
+}
+
+#sync-progress:empty {
+    display: none;
 }
 
 /* Container table */
@@ -73,19 +123,31 @@ Button {
     margin: 1 0;
 }
 
+/* Modern table styling with subtle borders */
 DataTable {
-    border: round $secondary;
+    border: round $panel;
     background: $surface;
+    margin: 1 0;
 }
 
 DataTable > .datatable--header {
-    background: $primary;
+    background: $accent 15%;
     color: $text;
     text-style: bold;
+    border-bottom: hkey $primary;
 }
 
 DataTable > .datatable--odd-row {
-    background: $panel;
+    background: $panel 50%;
+}
+
+DataTable > .datatable--even-row {
+    background: $surface;
+}
+
+DataTable > .datatable--cursor {
+    background: $accent 25%;
+    color: $text;
 }
 
 /* Instructions */
@@ -96,20 +158,28 @@ DataTable > .datatable--odd-row {
     padding: 0 1;
 }
 
-/* Checkboxes */
+/* Modern checkbox styling with better focus states */
 Checkbox {
-    margin: 0 1 0 0;
-    min-width: 12;
-    max-width: 16;
+    margin: 0 2 0 0;
+    min-width: 14;
+    max-width: 18;
+    background: $surface;
+    border: round $panel;
 }
 
 Checkbox:focus {
-    background: $accent 10%;
+    background: $accent 15%;
     border: thick $accent;
+    box-shadow: 0 0 3 $accent 30%;
+}
+
+Checkbox:checked {
+    background: $success 20%;
+    border: thick $success;
 }
 
 .version-row > Checkbox {
-    margin: 0 1 0 0;
+    margin: 0 2 0 0;
 }
 
 /* Note: Textual doesn't support :checked pseudo-class */

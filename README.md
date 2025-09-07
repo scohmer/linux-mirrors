@@ -41,11 +41,25 @@ sudo apt install -y podman
 sudo dnf install -y podman
 ```
 
-**Enable rootless containers (recommended):**
+**Enable rootless containers (distribution-specific):**
+
+**Debian/Ubuntu:**
 ```bash
 sudo sysctl kernel.unprivileged_userns_clone=1
 echo 'kernel.unprivileged_userns_clone=1' | sudo tee -a /etc/sysctl.conf
 ```
+
+**RHEL/Rocky/CentOS (if user namespaces are disabled):**
+```bash
+# Check if user namespaces are enabled (should be > 0)
+cat /proc/sys/user/max_user_namespaces
+
+# If disabled (0), enable with:
+echo 'user.max_user_namespaces=28633' | sudo tee -a /etc/sysctl.conf
+sudo sysctl -p
+```
+
+**Note:** Most modern distributions enable user namespaces by default. If rootless containers work without configuration, no additional setup is required.
 
 ### Install Dependencies
 
