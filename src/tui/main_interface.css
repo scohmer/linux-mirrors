@@ -170,12 +170,6 @@ Checkbox {
 Checkbox:focus {
     background: $accent 15%;
     border: thick $accent;
-    box-shadow: 0 0 3 $accent 30%;
-}
-
-Checkbox:checked {
-    background: $success 20%;
-    border: thick $success;
 }
 
 .version-row > Checkbox {
