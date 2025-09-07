@@ -602,8 +602,11 @@ class SyncManager:
             logger.info(f"Starting YUM distributions in parallel: {list(yum_distributions.keys())}")
             for dist_name, versions in yum_distributions.items():
                 dist_config = self.orchestrator.config_manager.get_config().distributions[dist_name]
-                task = self.sync_distribution(dist_config, versions)
+                task = asyncio.create_task(self.sync_distribution(dist_config, versions))
                 yum_tasks.append(task)
+            
+            # Give YUM tasks a chance to start before APT begins
+            await asyncio.sleep(0.1)
         
         # Run APT distributions sequentially (one at a time) while YUM runs in parallel
         if apt_distributions:
