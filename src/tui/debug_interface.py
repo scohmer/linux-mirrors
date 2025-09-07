@@ -267,6 +267,7 @@ class DebugInterface(Screen):
         super().__init__()
         self.config_manager = ConfigManager()
         self.orchestrator = ContainerOrchestrator(self.config_manager)
+        self.standalone_mode = False  # Will be set to True when run standalone
     
     def compose(self) -> ComposeResult:
         yield Header()
@@ -289,13 +290,12 @@ class DebugInterface(Screen):
     
     def on_button_pressed(self, event: Button.Pressed):
         if event.button.id == "back-main":
-            # Check if there are other screens in the stack
-            if len(self.app.screen_stack) > 1:
-                # There's a main screen underneath, go back to it
-                self.dismiss()
-            else:
-                # This is the only screen (standalone mode), exit the app
+            if self.standalone_mode:
+                # In standalone mode, exit the entire app
                 self.app.exit()
+            else:
+                # In embedded mode, go back to main screen
+                self.dismiss()
         elif event.button.id == "export-logs":
             self.export_debug_logs()
         elif event.button.id == "system-info":

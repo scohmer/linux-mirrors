@@ -321,7 +321,10 @@ async def main():
             
             class DebugApp(App):
                 def on_mount(self):
-                    self.push_screen(DebugInterface())
+                    debug_screen = DebugInterface()
+                    # Mark this as standalone mode
+                    debug_screen.standalone_mode = True
+                    self.push_screen(debug_screen)
             
             debug_app = DebugApp()
             await debug_app.run_async()
