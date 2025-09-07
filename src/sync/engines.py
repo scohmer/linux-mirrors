@@ -347,7 +347,7 @@ class YumSyncEngine(SyncEngine):
             fi &&
             echo "Using certificate: $CERT_FILE" &&
             echo "Using key: $KEY_FILE" &&
-            sed "s|sslclientcert=/etc/pki/entitlement/|sslclientcert=$CERT_FILE|g; s|sslclientkey=/etc/pki/entitlement/|sslclientkey=$KEY_FILE|g" <<< "{escaped_config}" > {config_file} &&
+            echo -e "{escaped_config}" | sed "s|sslclientcert=/etc/pki/entitlement/|sslclientcert=$CERT_FILE|g; s|sslclientkey=/etc/pki/entitlement/|sslclientkey=$KEY_FILE|g" > {config_file} &&
             {' && '.join(mkdir_commands)} &&
             {' && '.join(commands)} &&
             {' && '.join(createrepo_commands)}
