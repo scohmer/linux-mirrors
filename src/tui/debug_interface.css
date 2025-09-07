@@ -32,19 +32,19 @@
 }
 
 #debug-actions {
-    height: 4;
-    margin: 1 0 0 0;
+    height: 8;
+    margin: 1 0;
     padding: 1;
     background: $panel 30%;
     border: round $panel;
 }
 
-/* Compact section headers */
+/* Section headers */
 .section-header {
     color: $text;
     text-style: bold;
-    margin: 0;
-    padding: 1;
+    margin: 0 0 1 0;
+    padding: 1 2;
     background: $panel 50%;
     border-left: thick $primary 50%;
     border-bottom: hkey $panel;
@@ -52,16 +52,16 @@
 
 /* Container management */
 #debug-container-table {
-    height: 6;
-    margin: 0 0 1 0;
+    height: 10;
+    margin: 1 0;
     border: round $panel;
     background: $surface;
 }
 
 /* Storage table */
 #storage-table {
-    height: 5;
-    margin: 0;
+    height: 8;
+    margin: 1 0;
     border: round $panel;
     background: $surface;
 }
@@ -86,9 +86,9 @@
 
 /* Container action row */
 .container-actions {
-    height: 4;
-    margin: 0;
-    padding: 0;
+    height: 5;
+    margin: 1 0;
+    padding: 1;
 }
 
 /* Modern button styling with consistent design */
@@ -194,11 +194,11 @@ Select:focus {
     background: $surface;
 }
 
-/* Compact status indicators */
+/* Status indicators */
 #storage-summary {
     margin: 1 0;
     padding: 1;
-    height: 2;
+    height: 4;
     background: $panel 40%;
     border: round $panel;
     border-left: thick $primary 50%;
