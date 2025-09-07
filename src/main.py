@@ -238,6 +238,13 @@ def cmd_status(args, orchestrator: ContainerOrchestrator, storage_manager: Stora
         summary = verifier.get_verification_summary(verification_results)
         print(f"\\n{summary}")
         
+        # Show verified repositories first
+        verified_repos = [d for d in verification_results['details'] if d['status'] == 'verified']
+        if verified_repos:
+            print("\\nVerified repositories:")
+            for detail in verified_repos:
+                print(f"  ✓ {detail['distribution']} {detail['version']}: File integrity verified against origin repository")
+        
         # Show details for failed or missing repositories
         issues_found = False
         for detail in verification_results['details']:
@@ -248,8 +255,8 @@ def cmd_status(args, orchestrator: ContainerOrchestrator, storage_manager: Stora
                 status_symbol = "✗" if detail['status'] == 'failed' else "?"
                 print(f"  {status_symbol} {detail['distribution']} {detail['version']}: {detail['details']}")
         
-        if not issues_found and verification_results['verified'] > 0:
-            print("\\n✓ All repositories verified successfully")
+        if not issues_found and not verified_repos:
+            print("\\nNo repositories found or all repositories have issues")
         
         # Show verification statistics
         if verification_results['total_repos'] > 0:
