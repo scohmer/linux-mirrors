@@ -68,20 +68,16 @@ class DistributionSelector(Container):
             if not dist_config.enabled:
                 continue
             
-            # Debug: Check if we have versions
-            yield Static(f"Debug: {dist_name} has {len(dist_config.versions)} versions: {dist_config.versions}", classes="switch-label")
-                
-            with Container(classes="distribution-container"):
-                yield Static(f"{dist_name.title()} ({dist_config.type.upper()})", classes="dist-title")
-                
-                # Version switches 
-                self.switches[dist_name] = {}
-                for version in dist_config.versions:
-                    yield Static(f"  {version}", classes="switch-label")
-                    switch = Switch(value=False, id=f"{dist_name}-{version}")
-                    switch.can_focus = True
-                    self.switches[dist_name][version] = switch
-                    yield switch
+            yield Static(f"{dist_name.title()} ({dist_config.type.upper()})", classes="dist-title")
+            
+            # Version switches - try without Container first
+            self.switches[dist_name] = {}
+            for version in dist_config.versions:
+                yield Static(f"  {version}", classes="switch-label")
+                switch = Switch(value=False, id=f"{dist_name}-{version}")
+                switch.can_focus = True
+                self.switches[dist_name][version] = switch
+                yield switch
     
     def get_selected_distributions(self) -> Dict[str, List[str]]:
         selected = {}
