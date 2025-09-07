@@ -105,7 +105,9 @@ class ContainerManager(Container):
         
         # [INPUT DROPDOWN TO SELECT A CONTAINER] [STOP BUTTON] [INSPECT BUTTON]
         with Horizontal(classes="container-actions"):
+            yield Static("Select Container:", classes="action-label")
             self.action_select = Select[str]([], allow_blank=True, id="container-action-select")
+            self.action_select.can_focus = True
             yield self.action_select
             yield Button("Stop", id="stop-container", variant="warning")
             yield Button("Inspect", id="inspect-container", variant="default")
