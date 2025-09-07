@@ -18,6 +18,8 @@
     padding: 1;
     background: $surface;
     border: round $panel;
+    max-height: 100vh;
+    overflow-y: auto;
 }
 
 #right-panel {
@@ -26,6 +28,7 @@
     padding: 1;
     background: $surface;
     border: round $panel;
+    min-height: 100vh;
 }
 
 /* Modern section headers with subtle styling */
@@ -64,10 +67,11 @@
 /* Modern button styling with improved spacing */
 #button-row {
     margin: 2 0;
-    height: 4;
+    height: 5;
     padding: 1;
     background: $panel 30%;
     border: round $secondary;
+    dock: bottom;
 }
 
 Button {
