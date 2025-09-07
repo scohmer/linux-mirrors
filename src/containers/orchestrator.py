@@ -68,6 +68,25 @@ WORKDIR /mirror
 VOLUME ["/mirror"]
 '''
     
+    def _get_proxy_config(self, dist_config: DistributionConfig) -> Dict[str, str]:
+        """Get proxy configuration with distribution-specific overrides"""
+        # Start with global proxy settings
+        proxy_config = {
+            'http_proxy': getattr(self.config, 'http_proxy', None),
+            'https_proxy': getattr(self.config, 'https_proxy', None),
+            'no_proxy': getattr(self.config, 'no_proxy', None)
+        }
+        
+        # Override with distribution-specific settings if they exist
+        if hasattr(dist_config, 'http_proxy') and dist_config.http_proxy:
+            proxy_config['http_proxy'] = dist_config.http_proxy
+        if hasattr(dist_config, 'https_proxy') and dist_config.https_proxy:
+            proxy_config['https_proxy'] = dist_config.https_proxy
+        if hasattr(dist_config, 'no_proxy') and dist_config.no_proxy:
+            proxy_config['no_proxy'] = dist_config.no_proxy
+            
+        return proxy_config
+    
     def build_container_image(self, dist_config: DistributionConfig) -> str:
         # For RHEL, use UBI base image instead of building custom image
         if dist_config.name == "rhel":
@@ -159,6 +178,18 @@ VOLUME ["/mirror"]
                 '--env', f'DIST_VERSION={version}',
                 '--env', 'MIRROR_PATH=/mirror',
             ]
+            
+            # Add proxy environment variables
+            proxy_config = self._get_proxy_config(dist_config)
+            if proxy_config['http_proxy']:
+                create_cmd.extend(['--env', f'http_proxy={proxy_config["http_proxy"]}'])
+                create_cmd.extend(['--env', f'HTTP_PROXY={proxy_config["http_proxy"]}'])
+            if proxy_config['https_proxy']:
+                create_cmd.extend(['--env', f'https_proxy={proxy_config["https_proxy"]}'])
+                create_cmd.extend(['--env', f'HTTPS_PROXY={proxy_config["https_proxy"]}'])
+            if proxy_config['no_proxy']:
+                create_cmd.extend(['--env', f'no_proxy={proxy_config["no_proxy"]}'])
+                create_cmd.extend(['--env', f'NO_PROXY={proxy_config["no_proxy"]}'])
             
             # Add RHEL-specific credential mounts and root user
             if dist_config.name == "rhel":
