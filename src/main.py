@@ -14,6 +14,7 @@ from systemd.service_generator import SystemdServiceGenerator
 from storage.manager import StorageManager
 from tui.main_interface import MainInterface
 from tui.debug_interface import DebugInterface
+from verification.checker import RepositoryVerifier
 
 def setup_logging(level: str = "INFO"):
     """Configure logging for the application"""
@@ -48,6 +49,7 @@ Examples:
   %(prog)s sync --distribution debian --version bookworm
   %(prog)s setup-systemd --user              # Create systemd services for user
   %(prog)s status                             # Show container and sync status
+  %(prog)s status --verify                    # Show status with repository verification
   %(prog)s debug                              # Launch debug interface
         """
     )
@@ -103,7 +105,9 @@ Examples:
     )
     
     # Status command
-    subparsers.add_parser("status", help="Show system status")
+    status_parser = subparsers.add_parser("status", help="Show system status")
+    status_parser.add_argument("--verify", action="store_true", 
+                              help="Verify repository integrity against local filesystem")
     
     # Debug command  
     subparsers.add_parser("debug", help="Launch debug interface")
@@ -222,7 +226,7 @@ def cmd_setup_systemd(args, config_manager: ConfigManager):
         print(f"Error creating systemd services: {e}")
         return 1
 
-def cmd_status(orchestrator: ContainerOrchestrator, storage_manager: StorageManager):
+def cmd_status(args, orchestrator: ContainerOrchestrator, storage_manager: StorageManager, config_manager: ConfigManager):
     """Handle status command"""
     print("=== Linux Mirror System Status ===\\n")
     
@@ -242,6 +246,37 @@ def cmd_status(orchestrator: ContainerOrchestrator, storage_manager: StorageMana
         used_pct = path_info.get('used_percent', 0)
         free_gb = path_info.get('free_space', 0) / (1024**3)
         print(f"  {path}: {used_pct:.1f}% used, {free_gb:.1f}GB free")
+    
+    # Repository verification (if requested)
+    if args.verify:
+        print()
+        print("=== Repository Verification ===")
+        verifier = RepositoryVerifier(config_manager)
+        print("Checking repository integrity... (this may take a moment)")
+        
+        verification_results = verifier.verify_all_repositories()
+        summary = verifier.get_verification_summary(verification_results)
+        print(f"\\n{summary}")
+        
+        # Show details for failed or missing repositories
+        issues_found = False
+        for detail in verification_results['details']:
+            if detail['status'] in ['failed', 'missing']:
+                if not issues_found:
+                    print("\\nIssues found:")
+                    issues_found = True
+                status_symbol = "✗" if detail['status'] == 'failed' else "?"
+                print(f"  {status_symbol} {detail['distribution']} {detail['version']}: {detail['details']}")
+        
+        if not issues_found and verification_results['verified'] > 0:
+            print("\\n✓ All repositories verified successfully")
+        
+        # Show verification statistics
+        if verification_results['total_repos'] > 0:
+            print(f"\\nVerification stats:")
+            print(f"  Files checked: {sum(d['files_checked'] for d in verification_results['details'])}")
+            print(f"  Files missing: {sum(d['files_missing'] for d in verification_results['details'])}")
+            print(f"  Files corrupted: {sum(d['files_corrupted'] for d in verification_results['details'])}")
     
     return 0
 
@@ -307,7 +342,7 @@ async def main():
             return cmd_setup_systemd(args, config_manager)
         
         elif args.command == "status":
-            return cmd_status(orchestrator, storage_manager)
+            return cmd_status(args, orchestrator, storage_manager, config_manager)
         
         elif args.command == "storage":
             return cmd_storage(args, storage_manager)
