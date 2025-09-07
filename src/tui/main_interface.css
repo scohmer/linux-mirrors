@@ -160,12 +160,12 @@ DataTable > .datatable--cursor {
 /* Modern switch styling with labels */
 .switch-container {
     margin: 0 2 0 0;
-    align: center middle;
+    width: auto;
+    height: auto;
 }
 
 .switch-label {
-    margin: 0 1 0 0;
-    min-width: 12;
+    margin: 0 0 1 0;
     color: $text;
     text-align: center;
 }
@@ -176,11 +176,6 @@ Switch {
 
 Switch:focus {
     border: thick $accent;
-}
-
-.version-row > .switch-container {
-    margin: 0 2 0 0;
-    align: center middle;
 }
 
 /* Switch styling is handled by the framework */

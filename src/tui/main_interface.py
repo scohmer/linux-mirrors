@@ -72,7 +72,7 @@ class DistributionSelector(Container):
                 with Horizontal(classes="version-row"):
                     self.switches[dist_name] = {}
                     for version in dist_config.versions:
-                        with Horizontal(classes="switch-container"):
+                        with Vertical(classes="switch-container"):
                             yield Static(f"{version}", classes="switch-label")
                             switch = Switch(value=False, id=f"{dist_name}-{version}")
                             switch.can_focus = True  # Ensure switch can receive focus
