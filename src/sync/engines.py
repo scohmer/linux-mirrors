@@ -335,12 +335,30 @@ class YumSyncEngine(SyncEngine):
         # Escape the repo config for shell
         escaped_config = repo_config.replace('"', '\\"').replace('\n', '\\n')
         
-        full_command = f'''
-        echo -e "{escaped_config}" > {config_file} &&
-        {' && '.join(mkdir_commands)} &&
-        {' && '.join(commands)} &&
-        {' && '.join(createrepo_commands)}
-        '''
+        if self.dist_config.name == "rhel":
+            # For RHEL, we need to dynamically find and configure entitlement certificates
+            full_command = f'''
+            echo "Finding entitlement certificates..." &&
+            CERT_FILE=$(find /etc/pki/entitlement -name "*.pem" -not -name "*-key.pem" | head -1) &&
+            KEY_FILE=$(find /etc/pki/entitlement -name "*-key.pem" | head -1) &&
+            if [ -z "$CERT_FILE" ] || [ -z "$KEY_FILE" ]; then
+                echo "Error: Could not find entitlement certificates in /etc/pki/entitlement/"
+                exit 1
+            fi &&
+            echo "Using certificate: $CERT_FILE" &&
+            echo "Using key: $KEY_FILE" &&
+            sed "s|sslclientcert=/etc/pki/entitlement/|sslclientcert=$CERT_FILE|g; s|sslclientkey=/etc/pki/entitlement/|sslclientkey=$KEY_FILE|g" <<< "{escaped_config}" > {config_file} &&
+            {' && '.join(mkdir_commands)} &&
+            {' && '.join(commands)} &&
+            {' && '.join(createrepo_commands)}
+            '''
+        else:
+            full_command = f'''
+            echo -e "{escaped_config}" > {config_file} &&
+            {' && '.join(mkdir_commands)} &&
+            {' && '.join(commands)} &&
+            {' && '.join(createrepo_commands)}
+            '''
         
         return ['sh', '-c', full_command]
     
@@ -454,8 +472,8 @@ class YumSyncEngine(SyncEngine):
                         "gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release",
                         "sslverify=1",
                         "sslcacert=/etc/rhsm/ca/redhat-uep.pem",
-                        "sslclientkey=/etc/pki/entitlement/*-key.pem", 
-                        "sslclientcert=/etc/pki/entitlement/*.pem",
+                        "sslclientkey=/etc/pki/entitlement/",
+                        "sslclientcert=/etc/pki/entitlement/",
                         ""  # Empty line between sections
                     ])
         else:
