@@ -67,16 +67,16 @@
 /* Modern button styling with improved spacing */
 #button-row {
     margin: 2 0;
-    height: 5;
+    height: 7;
     padding: 1;
     background: $panel 30%;
     border: round $secondary;
-    dock: bottom;
 }
 
 Button {
     margin: 0 1;
     min-width: 12;
+    height: 3;
     border: round $primary;
     text-style: bold;
 }
