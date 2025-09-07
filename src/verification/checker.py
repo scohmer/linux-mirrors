@@ -58,7 +58,7 @@ class RepositoryVerifier:
                 'version': version,
                 'status': 'missing',
                 'path': repo_path,
-                'details': 'Repository directory not found',
+                'details': f'Repository directory not found at {repo_path}',
                 'files_checked': 0,
                 'files_missing': 0,
                 'files_corrupted': 0
@@ -262,7 +262,46 @@ class RepositoryVerifier:
     def _get_repository_path(self, dist_name: str, version: str, dist_config: DistributionConfig) -> str:
         """Get the local path for a repository"""
         if dist_config.type == 'apt':
-            return os.path.join(self.config.apt_path, dist_name)
+            base_path = os.path.join(self.config.apt_path, dist_name)
+            
+            # apt-mirror creates mirror/hostname/path structure
+            # Try to find the actual repository path
+            mirror_paths = []
+            
+            # Check for apt-mirror structure
+            for mirror_url in dist_config.mirror_urls:
+                # Extract hostname and path from mirror URL
+                # e.g., "http://deb.debian.org/debian/" -> "mirror/deb.debian.org/debian"
+                url_parts = mirror_url.replace('http://', '').replace('https://', '').rstrip('/')
+                mirror_path = os.path.join(base_path, 'mirror', url_parts)
+                mirror_paths.append(mirror_path)
+                
+                # Also check without the 'mirror' prefix (direct structure)
+                direct_path = os.path.join(base_path, url_parts)
+                mirror_paths.append(direct_path)
+            
+            # Also check the base path itself (in case it's structured differently)
+            mirror_paths.append(base_path)
+            
+            # Return the first path that exists and has dists directory
+            logger.debug(f"Checking APT repository paths for {dist_name}: {mirror_paths}")
+            for path in mirror_paths:
+                logger.debug(f"Checking path: {path}")
+                if os.path.exists(path):
+                    logger.debug(f"Path exists: {path}")
+                    dists_path = os.path.join(path, 'dists')
+                    if os.path.exists(dists_path):
+                        logger.debug(f"Found dists directory at: {dists_path}")
+                        return path
+                    else:
+                        logger.debug(f"No dists directory found at: {dists_path}")
+                else:
+                    logger.debug(f"Path does not exist: {path}")
+            
+            # If none found, return the first mirror path for error reporting
+            logger.debug(f"No valid APT repository path found for {dist_name}, returning: {mirror_paths[0] if mirror_paths else base_path}")
+            return mirror_paths[0] if mirror_paths else base_path
+            
         else:  # yum
             return os.path.join(self.config.yum_path, dist_name)
     
