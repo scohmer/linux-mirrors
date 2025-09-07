@@ -122,6 +122,23 @@ class RepositoryVerifier:
             
             return [arch for arch in configured_archs if arch in available_archs]
         
+        elif dist_name in ['rocky', 'rhel']:
+            # Rocky Linux and RHEL architecture support by version (same as sync engine)
+            if version == '8':
+                # Rocky/RHEL 8 only supports x86_64 and aarch64
+                available_archs = ['x86_64', 'aarch64']
+            elif version == '9':
+                # Rocky/RHEL 9 supports x86_64, aarch64, ppc64le, s390x
+                available_archs = ['x86_64', 'aarch64', 'ppc64le', 's390x']
+            elif version == '10':
+                # Rocky/RHEL 10 supports x86_64, aarch64, ppc64le, s390x, riscv64
+                available_archs = ['x86_64', 'aarch64', 'ppc64le', 's390x', 'riscv64']
+            else:
+                # For unknown versions, use all configured architectures
+                available_archs = configured_archs
+            
+            return [arch for arch in configured_archs if arch in available_archs]
+        
         # For other distributions or unknown versions, use all configured architectures
         return configured_archs
 
@@ -216,7 +233,10 @@ class RepositoryVerifier:
         details = []
         
         # YUM repos have different structure per version/architecture
-        for arch in dist_config.architectures or ['x86_64']:
+        # Get architectures that were actually available for this distribution version
+        available_architectures = self._get_available_architectures(dist_name, version, dist_config.architectures or ['x86_64'])
+        
+        for arch in available_architectures:
             arch_found = False
             
             # Check common YUM repository structures
