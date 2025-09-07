@@ -166,28 +166,30 @@ class AptSyncEngine(SyncEngine):
         if self.dist_config.name == "debian":
             archived_versions = ["wheezy", "jessie", "stretch", "buster", "bullseye"]
             
-            # Security repository
-            if version in archived_versions:
-                # Archived versions use archive.debian.org for security
-                security_url = "http://archive.debian.org/debian-security/"
-                # Older versions used different security suite naming
-                if version in ["wheezy", "jessie"]:
-                    security_suite = f"{version}/updates"
-                else:
+            # Only add security repositories for versions with publicly available security updates
+            # As of 2025: bullseye (LTS), bookworm, trixie have public security updates
+            # stretch/buster only have commercial ELTS, wheezy/jessie are EOL
+            versions_with_security = ["bullseye", "bookworm", "trixie"]
+            
+            if version in versions_with_security:
+                # Security repository
+                if version in archived_versions:
+                    # Archived versions with security (currently bullseye LTS)
+                    security_url = "http://archive.debian.org/debian-security/"
                     security_suite = f"{version}-security"
-            else:
-                # Current versions use security.debian.org
-                security_url = "http://security.debian.org/debian-security/"
-                security_suite = f"{version}-security"
-            
-            # Add security repository lines
-            for arch in self.dist_config.architectures:
-                security_line = f"deb-{arch} {security_url} {security_suite} {components}"
-                config_lines.append(security_line)
-            
-            if getattr(self.dist_config, 'include_source_packages', False):
-                security_src = f"deb-src {security_url} {security_suite} {components}"
-                config_lines.append(security_src)
+                else:
+                    # Current versions use security.debian.org
+                    security_url = "http://security.debian.org/debian-security/"
+                    security_suite = f"{version}-security"
+                
+                # Add security repository lines
+                for arch in self.dist_config.architectures:
+                    security_line = f"deb-{arch} {security_url} {security_suite} {components}"
+                    config_lines.append(security_line)
+                
+                if getattr(self.dist_config, 'include_source_packages', False):
+                    security_src = f"deb-src {security_url} {security_suite} {components}"
+                    config_lines.append(security_src)
             
             # Backports repository (skip for very old versions that didn't have backports)
             if version not in ["wheezy"]:  # wheezy didn't have official backports
