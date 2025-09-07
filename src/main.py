@@ -228,28 +228,8 @@ def cmd_setup_systemd(args, config_manager: ConfigManager):
 
 def cmd_status(args, orchestrator: ContainerOrchestrator, storage_manager: StorageManager, config_manager: ConfigManager):
     """Handle status command"""
-    print("=== Linux Mirror System Status ===\\n")
-    
-    # Container status
-    containers = orchestrator.list_running_containers()
-    print(f"Containers: {len(containers)} running")
-    for container in containers:
-        print(f"  {container['name']}: {container['status']} ({container['image']})")
-    
-    print()
-    
-    # Storage status
-    storage_info = storage_manager.get_storage_info()
-    print(f"Storage: {storage_info['total_repos']} repositories")
-    for path_info in storage_info['paths']:
-        path = path_info['path']
-        used_pct = path_info.get('used_percent', 0)
-        free_gb = path_info.get('free_space', 0) / (1024**3)
-        print(f"  {path}: {used_pct:.1f}% used, {free_gb:.1f}GB free")
-    
-    # Repository verification (if requested)
     if args.verify:
-        print()
+        # Repository verification only mode
         print("=== Repository Verification ===")
         verifier = RepositoryVerifier(config_manager)
         print("Checking repository integrity... (this may take a moment)")
@@ -277,6 +257,27 @@ def cmd_status(args, orchestrator: ContainerOrchestrator, storage_manager: Stora
             print(f"  Files checked: {sum(d['files_checked'] for d in verification_results['details'])}")
             print(f"  Files missing: {sum(d['files_missing'] for d in verification_results['details'])}")
             print(f"  Files corrupted: {sum(d['files_corrupted'] for d in verification_results['details'])}")
+    
+    else:
+        # Standard system status mode
+        print("=== Linux Mirror System Status ===\\n")
+        
+        # Container status
+        containers = orchestrator.list_running_containers()
+        print(f"Containers: {len(containers)} running")
+        for container in containers:
+            print(f"  {container['name']}: {container['status']} ({container['image']})")
+        
+        print()
+        
+        # Storage status
+        storage_info = storage_manager.get_storage_info()
+        print(f"Storage: {storage_info['total_repos']} repositories")
+        for path_info in storage_info['paths']:
+            path = path_info['path']
+            used_pct = path_info.get('used_percent', 0)
+            free_gb = path_info.get('free_space', 0) / (1024**3)
+            print(f"  {path}: {used_pct:.1f}% used, {free_gb:.1f}GB free")
     
     return 0
 
