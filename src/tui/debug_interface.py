@@ -11,7 +11,6 @@ from textual.screen import Screen
 
 from config.manager import ConfigManager
 from containers.orchestrator import ContainerOrchestrator
-from storage.manager import StorageManager
 
 logger = logging.getLogger(__name__)
 
@@ -255,73 +254,6 @@ class ContainerManager(Container):
         except Exception as e:
             self.notify(f"Failed to inspect container: {e}", severity="error")
 
-class StorageInfo(Container):
-    def __init__(self, config_manager: ConfigManager):
-        super().__init__()
-        self.config_manager = config_manager
-        self.storage_manager = StorageManager(config_manager)
-    
-    def compose(self) -> ComposeResult:
-        yield Static("Storage Information", classes="section-header")
-        
-        with Horizontal():
-            yield Button("Refresh", id="refresh-storage", variant="default")
-            yield Button("Cleanup", id="cleanup-storage", variant="warning")
-        
-        self.storage_table = DataTable(id="storage-table")
-        self.storage_table.add_columns("Path", "Size", "Used %", "Free Space")
-        yield self.storage_table
-        
-        yield Static("", id="storage-summary")
-    
-    def on_mount(self):
-        self.refresh_storage_info()
-    
-    def on_button_pressed(self, event: Button.Pressed):
-        if event.button.id == "refresh-storage":
-            self.refresh_storage_info()
-        elif event.button.id == "cleanup-storage":
-            self.cleanup_storage()
-    
-    def refresh_storage_info(self):
-        try:
-            storage_info = self.storage_manager.get_storage_info()
-            
-            # Clear and repopulate table
-            self.storage_table.clear()
-            
-            for path_info in storage_info['paths']:
-                self.storage_table.add_row(
-                    path_info['path'],
-                    self._format_size(path_info['total_size']),
-                    f"{path_info['used_percent']:.1f}%",
-                    self._format_size(path_info['free_space'])
-                )
-            
-            # Update summary
-            summary = self.query_one("#storage-summary", Static)
-            summary.update(f"Total repositories: {storage_info['total_repos']}")
-            
-            self.notify("Storage information refreshed")
-            
-        except Exception as e:
-            self.notify(f"Failed to get storage info: {e}", severity="error")
-    
-    def cleanup_storage(self):
-        try:
-            result = self.storage_manager.cleanup_old_syncs()
-            self.notify(f"Cleanup completed: freed {self._format_size(result['freed_space'])}", 
-                       severity="success")
-            self.refresh_storage_info()
-        except Exception as e:
-            self.notify(f"Cleanup failed: {e}", severity="error")
-    
-    def _format_size(self, size_bytes: int) -> str:
-        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
-            if size_bytes < 1024.0:
-                return f"{size_bytes:.1f} {unit}"
-            size_bytes /= 1024.0
-        return f"{size_bytes:.1f} PB"
 
 class DebugInterface(Screen):
     CSS_PATH = "debug_interface.css"
@@ -338,7 +270,6 @@ class DebugInterface(Screen):
             with Horizontal(id="debug-content"):
                 with Vertical(id="debug-left-panel"):
                     yield ContainerManager(self.orchestrator)
-                    yield StorageInfo(self.config_manager)
                     
                     # Move action buttons to left panel only
                     with Horizontal(id="debug-actions"):
