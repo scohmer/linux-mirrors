@@ -167,23 +167,42 @@ class YumSyncEngine(SyncEngine):
         repo_config = self._generate_yum_repo_config(version)
         config_file = f"/mirror/{repo_name}.repo"
         
+        # Get version-specific architectures
+        supported_archs = self._get_supported_architectures(version)
+        
         # Create reposync command for each architecture using the config file
         commands = []
-        # First, create necessary directories
-        mkdir_commands = []
-        for arch in self.dist_config.architectures:
-            mkdir_commands.append(f"mkdir -p /mirror/{arch}")
+        createrepo_commands = []
         
-        for arch in self.dist_config.architectures:
+        # Create directory structure that matches official Rocky/RHEL layout
+        mkdir_commands = []
+        # Create temporary sync directory
+        mkdir_commands.append("mkdir -p /tmp/sync")
+        
+        for arch in supported_archs:
+            # Create BaseOS and AppStream directories for each architecture
+            mkdir_commands.append(f"mkdir -p /mirror/{version}/BaseOS/{arch}/os")
+            mkdir_commands.append(f"mkdir -p /mirror/{version}/AppStream/{arch}/os")
+        
+        for arch in supported_archs:
             for mirror_url in self.dist_config.mirror_urls:
-                # Use --config option to specify our repo file location
-                # Note: using -p for --download-path and correct argument names
-                cmd = f"dnf reposync --config={config_file} --repoid={repo_name}-baseos-{arch} --arch={arch} -p /mirror --download-metadata"
+                # BaseOS repository - sync to proper path
+                baseos_path = f"/mirror/{version}/BaseOS/{arch}/os"
+                # reposync creates a subdirectory with repo name, so we sync to parent and then move
+                cmd = f"dnf reposync --config={config_file} --repoid={repo_name}-baseos-{arch} --arch={arch} -p /tmp/sync --download-metadata && mv /tmp/sync/{repo_name}-baseos-{arch}/* {baseos_path}/ && rm -rf /tmp/sync/{repo_name}-baseos-{arch}"
                 commands.append(cmd)
                 
-                # Add AppStream repository
-                appstream_cmd = f"dnf reposync --config={config_file} --repoid={repo_name}-appstream-{arch} --arch={arch} -p /mirror --download-metadata"
+                # Create repository metadata for BaseOS
+                createrepo_commands.append(f"createrepo_c {baseos_path}")
+                
+                # AppStream repository - sync to proper path
+                appstream_path = f"/mirror/{version}/AppStream/{arch}/os"
+                # reposync creates a subdirectory with repo name, so we sync to parent and then move
+                appstream_cmd = f"dnf reposync --config={config_file} --repoid={repo_name}-appstream-{arch} --arch={arch} -p /tmp/sync --download-metadata && mv /tmp/sync/{repo_name}-appstream-{arch}/* {appstream_path}/ && rm -rf /tmp/sync/{repo_name}-appstream-{arch}"
                 commands.append(appstream_cmd)
+                
+                # Create repository metadata for AppStream
+                createrepo_commands.append(f"createrepo_c {appstream_path}")
         
         # Escape the repo config for shell
         escaped_config = repo_config.replace('"', '\\"').replace('\n', '\\n')
@@ -192,16 +211,35 @@ class YumSyncEngine(SyncEngine):
         echo -e "{escaped_config}" > {config_file} &&
         {' && '.join(mkdir_commands)} &&
         {' && '.join(commands)} &&
-        createrepo_c /mirror/
+        {' && '.join(createrepo_commands)}
         '''
         
         return ['sh', '-c', full_command]
+    
+    def _get_supported_architectures(self, version: str) -> List[str]:
+        """Filter architectures based on version support for Rocky Linux and RHEL."""
+        all_archs = self.dist_config.architectures
+        
+        # Rocky Linux and RHEL architecture support by version
+        if self.dist_config.name in ["rocky", "rhel"]:
+            if version == "8":
+                # Rocky/RHEL 8 only supports x86_64 and aarch64
+                return [arch for arch in all_archs if arch in ["x86_64", "aarch64"]]
+            elif version == "9":
+                # Rocky/RHEL 9 supports all listed architectures
+                return all_archs
+        
+        # For other distributions, return all architectures
+        return all_archs
     
     def _generate_yum_repo_config(self, version: str) -> str:
         repo_name = f"{self.dist_config.name}-{version}"
         config_lines = []
         
-        for arch in self.dist_config.architectures:
+        # Get version-specific architectures
+        supported_archs = self._get_supported_architectures(version)
+        
+        for arch in supported_archs:
             for mirror_url in self.dist_config.mirror_urls:
                 # BaseOS repository
                 config_lines.extend([

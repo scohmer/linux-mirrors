@@ -93,15 +93,15 @@ class MirrorConfig:
                 name="rocky",
                 type="yum",
                 versions=["8", "9"],
-                mirror_urls=["https://download.rockylinux.org/pub/rocky/"],
-                architectures=["x86_64", "aarch64"]
+                mirror_urls=["https://dl.rockylinux.org/pub/rocky/"],
+                architectures=["x86_64", "aarch64", "ppc64le", "s390x"]
             ),
             "rhel": DistributionConfig(
                 name="rhel",
                 type="yum",
                 versions=["8", "9"],
                 mirror_urls=["https://cdn.redhat.com/content/dist/rhel/"],
-                architectures=["x86_64", "aarch64"],
+                architectures=["x86_64", "aarch64", "ppc64le", "s390x"],
                 enabled=False  # Requires subscription
             )
         }
