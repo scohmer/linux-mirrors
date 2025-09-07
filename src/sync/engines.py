@@ -150,18 +150,64 @@ class AptSyncEngine(SyncEngine):
         # Get version-specific mirror URLs
         mirror_urls = self._get_version_specific_urls(version)
         
-        # Add repository lines for each architecture
+        # Add main repository lines
+        components = " ".join(self.dist_config.components)
         for mirror_url in mirror_urls:
             for arch in self.dist_config.architectures:
-                components = " ".join(self.dist_config.components)
                 repo_line = f"deb-{arch} {mirror_url} {version} {components}"
                 config_lines.append(repo_line)
             
             # Add source packages if enabled
             if getattr(self.dist_config, 'include_source_packages', False):
-                components = " ".join(self.dist_config.components)
                 src_line = f"deb-src {mirror_url} {version} {components}"
                 config_lines.append(src_line)
+        
+        # Add Debian-specific security and backports repositories
+        if self.dist_config.name == "debian":
+            archived_versions = ["wheezy", "jessie", "stretch", "buster", "bullseye"]
+            
+            # Security repository
+            if version in archived_versions:
+                # Archived versions use archive.debian.org for security
+                security_url = "http://archive.debian.org/debian-security/"
+                # Older versions used different security suite naming
+                if version in ["wheezy", "jessie"]:
+                    security_suite = f"{version}/updates"
+                else:
+                    security_suite = f"{version}-security"
+            else:
+                # Current versions use security.debian.org
+                security_url = "http://security.debian.org/debian-security/"
+                security_suite = f"{version}-security"
+            
+            # Add security repository lines
+            for arch in self.dist_config.architectures:
+                security_line = f"deb-{arch} {security_url} {security_suite} {components}"
+                config_lines.append(security_line)
+            
+            if getattr(self.dist_config, 'include_source_packages', False):
+                security_src = f"deb-src {security_url} {security_suite} {components}"
+                config_lines.append(security_src)
+            
+            # Backports repository (skip for very old versions that didn't have backports)
+            if version not in ["wheezy"]:  # wheezy didn't have official backports
+                if version in archived_versions:
+                    # Archived backports use archive.debian.org
+                    backports_url = "http://archive.debian.org/debian/"
+                else:
+                    # Current backports use deb.debian.org
+                    backports_url = "http://deb.debian.org/debian/"
+                
+                backports_suite = f"{version}-backports"
+                
+                # Add backports repository lines
+                for arch in self.dist_config.architectures:
+                    backports_line = f"deb-{arch} {backports_url} {backports_suite} {components}"
+                    config_lines.append(backports_line)
+                
+                if getattr(self.dist_config, 'include_source_packages', False):
+                    backports_src = f"deb-src {backports_url} {backports_suite} {components}"
+                    config_lines.append(backports_src)
         
         config_lines.append("")
         # Use appropriate clean URL based on version
