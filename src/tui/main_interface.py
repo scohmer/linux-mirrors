@@ -70,14 +70,17 @@ class DistributionSelector(Container):
             
             yield Static(f"{dist_name.title()} ({dist_config.type.upper()})", classes="dist-title")
             
-            # Version switches - try without Container first
-            self.switches[dist_name] = {}
-            for version in dist_config.versions:
-                yield Static(f"  {version}", classes="switch-label")
-                switch = Switch(value=False, id=f"{dist_name}-{version}")
-                switch.can_focus = True
-                self.switches[dist_name][version] = switch
-                yield switch
+            # Create horizontal layout for versions
+            with Horizontal(classes="version-row"):
+                self.switches[dist_name] = {}
+                for version in dist_config.versions:
+                    # Create a simple vertical group for each version
+                    with Vertical(classes="version-item"):
+                        yield Static(f"{version}", classes="version-label")
+                        switch = Switch(value=False, id=f"{dist_name}-{version}")
+                        switch.can_focus = True
+                        self.switches[dist_name][version] = switch
+                        yield switch
     
     def get_selected_distributions(self) -> Dict[str, List[str]]:
         selected = {}

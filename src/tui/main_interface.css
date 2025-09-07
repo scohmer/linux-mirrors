@@ -56,10 +56,9 @@
 }
 
 .version-row {
-    height: auto;
-    margin: 0 2 1 0;
+    height: 4;
+    margin: 0 0 1 0;
     padding: 0;
-    width: auto;
 }
 
 /* Modern button styling with improved spacing */
@@ -158,17 +157,19 @@ DataTable > .datatable--cursor {
     padding: 0 1;
 }
 
-/* Modern switch styling with labels */
-.switch-container {
-    margin: 0 2 0 0;
+/* Modern version item styling */
+.version-item {
+    margin: 0 1 0 0;
     width: auto;
     height: auto;
+    min-width: 12;
 }
 
-.switch-label {
-    margin: 0 1 0 0;
+.version-label {
+    margin: 0;
     color: $text;
-    min-width: 12;
+    text-align: center;
+    height: 1;
 }
 
 Switch {
