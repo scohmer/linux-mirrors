@@ -5,7 +5,7 @@ import logging
 from typing import Dict, List, Optional, Any
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal, Vertical
-from textual.widgets import Header, Footer, Static, Button, Checkbox, Log, ProgressBar, DataTable
+from textual.widgets import Header, Footer, Static, Button, Switch, Log, ProgressBar, DataTable
 from textual.reactive import reactive
 from textual.message import Message
 from rich.text import Text
@@ -55,11 +55,11 @@ class DistributionSelector(Container):
         super().__init__()
         self.config_manager = config_manager
         self.config = config_manager.get_config()
-        self.checkboxes: Dict[str, Dict[str, Checkbox]] = {}
+        self.switches: Dict[str, Dict[str, Switch]] = {}
     
     def compose(self) -> ComposeResult:
         yield Static("Select distributions and versions to sync:", classes="section-header")
-        yield Static("Use Tab/Shift+Tab to navigate, Space to toggle checkboxes", id="instructions")
+        yield Static("Use Tab/Shift+Tab to navigate, Space/Enter to toggle switches", id="instructions")
         
         for dist_name, dist_config in self.config.distributions.items():
             if not dist_config.enabled:
@@ -68,35 +68,37 @@ class DistributionSelector(Container):
             with Container(classes="distribution-container"):
                 yield Static(f"{dist_name.title()} ({dist_config.type.upper()})", classes="dist-title")
                 
-                # Version checkboxes in horizontal layout
+                # Version switches in horizontal layout
                 with Horizontal(classes="version-row"):
-                    self.checkboxes[dist_name] = {}
+                    self.switches[dist_name] = {}
                     for version in dist_config.versions:
-                        checkbox = Checkbox(f"{version}", value=False, id=f"{dist_name}-{version}")
-                        checkbox.can_focus = True  # Ensure checkbox can receive focus
-                        self.checkboxes[dist_name][version] = checkbox
-                        yield checkbox
+                        with Horizontal(classes="switch-container"):
+                            yield Static(f"{version}", classes="switch-label")
+                            switch = Switch(value=False, id=f"{dist_name}-{version}")
+                            switch.can_focus = True  # Ensure switch can receive focus
+                            self.switches[dist_name][version] = switch
+                            yield switch
     
     def get_selected_distributions(self) -> Dict[str, List[str]]:
         selected = {}
-        for dist_name, version_checkboxes in self.checkboxes.items():
+        for dist_name, version_switches in self.switches.items():
             selected_versions = []
-            for version, checkbox in version_checkboxes.items():
-                if checkbox.value:
+            for version, switch in version_switches.items():
+                if switch.value:
                     selected_versions.append(version)
             if selected_versions:
                 selected[dist_name] = selected_versions
         return selected
     
     def select_all_distributions(self):
-        for dist_checkboxes in self.checkboxes.values():
-            for checkbox in dist_checkboxes.values():
-                checkbox.value = True
+        for dist_switches in self.switches.values():
+            for switch in dist_switches.values():
+                switch.value = True
     
     def clear_all_selections(self):
-        for dist_checkboxes in self.checkboxes.values():
-            for checkbox in dist_checkboxes.values():
-                checkbox.value = False
+        for dist_switches in self.switches.values():
+            for switch in dist_switches.values():
+                switch.value = False
 
 class MainInterface(App):
     CSS_PATH = "main_interface.css"

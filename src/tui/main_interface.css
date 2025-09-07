@@ -157,26 +157,33 @@ DataTable > .datatable--cursor {
     padding: 0 1;
 }
 
-/* Modern checkbox styling with better focus states */
-Checkbox {
+/* Modern switch styling with labels */
+.switch-container {
     margin: 0 2 0 0;
-    min-width: 14;
-    max-width: 18;
-    background: $surface;
-    border: round $panel;
+    align: center middle;
 }
 
-Checkbox:focus {
-    background: $accent 15%;
+.switch-label {
+    margin: 0 1 0 0;
+    min-width: 12;
+    color: $text;
+    text-align: center;
+}
+
+Switch {
+    margin: 0;
+}
+
+Switch:focus {
     border: thick $accent;
 }
 
-.version-row > Checkbox {
+.version-row > .switch-container {
     margin: 0 2 0 0;
+    align: center middle;
 }
 
-/* Note: Textual doesn't support :checked pseudo-class */
-/* Checkbox styling is handled by the framework */
+/* Switch styling is handled by the framework */
 
 /* Status colors */
 .status-pending {
