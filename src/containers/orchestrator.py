@@ -69,6 +69,10 @@ VOLUME ["/mirror"]
 '''
     
     def build_container_image(self, dist_config: DistributionConfig) -> str:
+        # For RHEL, use UBI base image instead of building custom image
+        if dist_config.name == "rhel":
+            return "registry.access.redhat.com/ubi8/ubi:latest"
+        
         image_tag = f"localhost/linux-mirror-{dist_config.name}:latest"
         
         try:
@@ -154,8 +158,16 @@ VOLUME ["/mirror"]
                 '--env', f'DIST_NAME={dist_name}',
                 '--env', f'DIST_VERSION={version}',
                 '--env', 'MIRROR_PATH=/mirror',
-                image_tag
-            ] + command
+            ]
+            
+            # Add RHEL-specific credential mounts
+            if dist_config.name == "rhel":
+                create_cmd.extend([
+                    '--volume', '/etc/pki/entitlement:/etc/pki/entitlement:ro,z',
+                    '--volume', '/etc/rhsm/rhsm.conf:/etc/rhsm/rhsm.conf:ro,z',
+                ])
+            
+            create_cmd.extend([image_tag] + command)
             
             result = subprocess.run(create_cmd, capture_output=True, text=True, check=True)
             container_id = result.stdout.strip()

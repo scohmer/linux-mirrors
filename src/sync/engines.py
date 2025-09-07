@@ -232,7 +232,13 @@ class YumSyncEngine(SyncEngine):
         
         # Create repository configuration first
         repo_config = self._generate_yum_repo_config(version)
-        config_file = f"/mirror/{repo_name}.repo"
+        
+        if self.dist_config.name == "rhel":
+            # For RHEL, place repo file in standard location and use proper naming
+            config_file = f"/tmp/redhat-{version}.repo"
+        else:
+            # For Rocky/other YUM distros, use existing approach
+            config_file = f"/mirror/{repo_name}.repo"
         
         # Get version-specific architectures and repositories
         supported_archs = self._get_supported_architectures(version)
@@ -254,15 +260,51 @@ class YumSyncEngine(SyncEngine):
         
         # Generate sync commands for all repositories
         for arch in supported_archs:
-            for mirror_url in self.dist_config.mirror_urls:
+            if self.dist_config.name == "rhel":
+                # RHEL doesn't iterate over mirror_urls since we use specific CDN URLs
                 for repo_id, repo_info in repositories.items():
                     repo_path = f"/mirror/{version}/{repo_info['path']}/{arch}/os"
-                    repo_tmp = f"/tmp/sync/{repo_name}-{repo_id}-{arch}"
+                    repo_tmp = f"/tmp/sync/rhel-{version}-{repo_id.lower()}-rpms-{arch}"
                     
-                    # Sync command with enhanced error handling and debugging
+                    # RHEL sync command with entitlement authentication
                     cmd = f"""
-                    echo "Starting sync for {repo_id} {arch}..." &&
-                    dnf reposync --config={config_file} --repoid={repo_name}-{repo_id}-{arch} --arch={arch} -p /tmp/sync --download-metadata --verbose 2>&1 &&
+                    echo "Installing dnf-plugins-core for RHEL sync..." &&
+                    dnf install -y dnf-plugins-core &&
+                    echo "Starting RHEL sync for {repo_id} {arch}..." &&
+                    dnf reposync --config={config_file} --repoid=rhel-{version}-{repo_id.lower()}-rpms-{arch} --arch={arch} -p /tmp/sync --download-metadata --verbose 2>&1 &&
+                    echo "Sync completed, checking results..." &&
+                    ls -la /tmp/sync/ &&
+                    if [ -d {repo_tmp} ]; then
+                        echo "Found sync directory {repo_tmp}" &&
+                        ls -la {repo_tmp}/ &&
+                        if [ -n "$(ls -A {repo_tmp} 2>/dev/null)" ]; then
+                            echo "Moving files to {repo_path}..." &&
+                            mv {repo_tmp}/* {repo_path}/ &&
+                            rm -rf {repo_tmp} &&
+                            echo "Successfully synced {repo_id} {arch}"
+                        else
+                            echo "No files in {repo_tmp}, cleaning up..." &&
+                            rm -rf {repo_tmp}
+                        fi
+                    else
+                        echo "Sync directory {repo_tmp} not found, may have failed"
+                    fi
+                    """.strip()
+                    commands.append(cmd)
+                    
+                    # Create repository metadata (only if directory has content)
+                    createrepo_commands.append(f"[ -n \"$(ls -A {repo_path} 2>/dev/null)\" ] && createrepo_c {repo_path} || echo \"Skipping createrepo for empty {repo_path}\"")
+            else:
+                # Rocky Linux and other YUM distributions
+                for mirror_url in self.dist_config.mirror_urls:
+                    for repo_id, repo_info in repositories.items():
+                        repo_path = f"/mirror/{version}/{repo_info['path']}/{arch}/os"
+                        repo_tmp = f"/tmp/sync/{repo_name}-{repo_id}-{arch}"
+                        
+                        # Standard sync command
+                        cmd = f"""
+                        echo "Starting sync for {repo_id} {arch}..." &&
+                        dnf reposync --config={config_file} --repoid={repo_name}-{repo_id}-{arch} --arch={arch} -p /tmp/sync --download-metadata --verbose 2>&1 &&
                     echo "Sync completed, checking results..." &&
                     ls -la /tmp/sync/ &&
                     if [ -d {repo_tmp} ]; then
@@ -399,17 +441,36 @@ class YumSyncEngine(SyncEngine):
         # Define all available repositories by version
         repositories = self._get_available_repositories(version)
         
-        for arch in supported_archs:
-            for mirror_url in self.dist_config.mirror_urls:
+        if self.dist_config.name == "rhel":
+            # Generate RHEL-specific repo configuration with entitlement authentication
+            for arch in supported_archs:
                 for repo_id, repo_info in repositories.items():
                     config_lines.extend([
-                        f"[{repo_name}-{repo_id}-{arch}]",
-                        f"name={self.dist_config.name.title()} {version} - {repo_info['name']} ({arch})",
-                        f"baseurl={mirror_url}{version}/{repo_info['path']}/{arch}/os/",
+                        f"[rhel-{version}-{repo_id.lower()}-rpms-{arch}]",
+                        f"name=Red Hat Enterprise Linux {version} - {repo_info['name']} (RPMs) ({arch})",
+                        f"baseurl=https://cdn.redhat.com/content/dist/rhel{version}/{version}/{arch}/{repo_id.lower()}/os",
                         "enabled=1",
-                        "gpgcheck=0",  # Disable gpgcheck for now to avoid key issues
+                        "gpgcheck=1",
+                        "gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release",
+                        "sslverify=1",
+                        "sslcacert=/etc/rhsm/ca/redhat-uep.pem",
+                        "sslclientkey=/etc/pki/entitlement/*-key.pem", 
+                        "sslclientcert=/etc/pki/entitlement/*.pem",
                         ""  # Empty line between sections
                     ])
+        else:
+            # Generate standard repo configuration for Rocky/other YUM distros
+            for arch in supported_archs:
+                for mirror_url in self.dist_config.mirror_urls:
+                    for repo_id, repo_info in repositories.items():
+                        config_lines.extend([
+                            f"[{repo_name}-{repo_id}-{arch}]",
+                            f"name={self.dist_config.name.title()} {version} - {repo_info['name']} ({arch})",
+                            f"baseurl={mirror_url}{version}/{repo_info['path']}/{arch}/os/",
+                            "enabled=1",
+                            "gpgcheck=0",  # Disable gpgcheck for now to avoid key issues
+                            ""  # Empty line between sections
+                        ])
         
         return "\n".join(config_lines)
     
