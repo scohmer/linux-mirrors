@@ -107,10 +107,9 @@ class ContainerManager(Container):
         self.container_table.add_columns("ID", "Name", "Status", "Image", "Created")
         yield self.container_table
         
-        with Horizontal():
+        with Horizontal(classes="container-actions"):
             # Initialize with empty options, will populate on mount
             self.action_select = Select[str]([], allow_blank=True, id="container-action-select")
-            self.action_select.styles.width = "50%"
             yield self.action_select
             yield Button("Stop", id="stop-container", variant="warning")
             yield Button("Inspect", id="inspect-container", variant="default")
