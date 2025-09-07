@@ -33,14 +33,14 @@
     margin: 1 0;
 }
 
-/* Modern section headers with gradient-like effect */
+/* Modern section headers with muted styling */
 .section-header {
-    color: $primary;
+    color: $text;
     text-style: bold;
     margin: 0 0 1 0;
     padding: 1 2;
-    background: $accent 10%;
-    border-left: thick $accent;
+    background: $panel 50%;
+    border-left: thick $primary 50%;
     border-bottom: hkey $panel;
 }
 
