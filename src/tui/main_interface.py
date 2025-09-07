@@ -67,6 +67,9 @@ class DistributionSelector(Container):
         for dist_name, dist_config in self.config.distributions.items():
             if not dist_config.enabled:
                 continue
+            
+            # Debug: Check if we have versions
+            yield Static(f"Debug: {dist_name} has {len(dist_config.versions)} versions: {dist_config.versions}", classes="switch-label")
                 
             with Container(classes="distribution-container"):
                 yield Static(f"{dist_name.title()} ({dist_config.type.upper()})", classes="dist-title")
