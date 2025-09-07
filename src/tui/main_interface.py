@@ -61,6 +61,9 @@ class DistributionSelector(Container):
         yield Static("Select distributions and versions to sync:", classes="section-header")
         yield Static("Use Tab/Shift+Tab to navigate, Space/Enter to toggle switches", id="instructions")
         
+        # Debug: Add a test static to see if anything is appearing
+        yield Static("Debug: This should be visible", classes="switch-label")
+        
         for dist_name, dist_config in self.config.distributions.items():
             if not dist_config.enabled:
                 continue
