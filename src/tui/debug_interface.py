@@ -30,6 +30,7 @@ class LogViewer(Container):
             self.container_select.styles.width = "50%"
             yield self.container_select
             yield Button("View Logs", id="view-logs", variant="primary")
+            yield Button("Follow Logs", id="follow-logs", variant="success")
             yield Button("Clear", id="clear-logs", variant="default")
             yield Button("Refresh", id="refresh-containers", variant="default")
         
@@ -44,6 +45,9 @@ class LogViewer(Container):
         if event.button.id == "view-logs":
             if self.container_select.value != Select.BLANK:
                 self.load_container_logs(self.container_select.value)
+        elif event.button.id == "follow-logs":
+            if self.container_select.value != Select.BLANK:
+                self.follow_container_logs(self.container_select.value)
         elif event.button.id == "clear-logs":
             self.log_display.text = ""
         elif event.button.id == "refresh-containers":
@@ -76,6 +80,15 @@ class LogViewer(Container):
             self.current_container_id = container_id
         except Exception as e:
             self.log_display.text = f"Error loading logs: {e}"
+    
+    def follow_container_logs(self, container_id: str):
+        """Load logs using follow method - better for running containers"""
+        try:
+            logs = self.orchestrator.get_container_logs_follow(container_id, lines=100)
+            self.log_display.text = logs
+            self.current_container_id = container_id
+        except Exception as e:
+            self.log_display.text = f"Error following logs: {e}"
 
 class ContainerManager(Container):
     def __init__(self, orchestrator: ContainerOrchestrator):

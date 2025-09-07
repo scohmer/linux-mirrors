@@ -227,13 +227,71 @@ VOLUME ["/mirror"]
     
     def get_container_logs(self, container_id: str, tail: int = 100) -> str:
         try:
-            result = subprocess.run([self.container_runtime, 'logs', '--timestamps', '--tail', str(tail), container_id], 
+            # Get both stdout and stderr, without timestamps for better readability
+            result = subprocess.run([self.container_runtime, 'logs', '--tail', str(tail), container_id], 
                                   capture_output=True, text=True, check=True)
-            return result.stdout
+            
+            # Combine stdout and stderr for complete log output
+            combined_output = ""
+            if result.stdout:
+                combined_output += result.stdout
+            if result.stderr:
+                if combined_output:
+                    combined_output += "\n" + result.stderr
+                else:
+                    combined_output = result.stderr
+            
+            # If no output, check if container is running and provide helpful message
+            if not combined_output:
+                status = self.get_container_status(container_id)
+                container_status = status.get('status', 'unknown')
+                
+                if container_status == 'running':
+                    combined_output = f"Container {container_id[:12]}... is running but no logs are available yet.\nThis may happen if the container just started or hasn't produced output.\n\nTip: Try refreshing in a few seconds or check if the sync process is active."
+                elif container_status == 'exited':
+                    combined_output = f"Container {container_id[:12]}... has exited but no logs were captured.\nThis may happen if the container exited immediately or had no output."
+                else:
+                    combined_output = f"Container {container_id[:12]}... status: {container_status}\nNo logs available."
+            
+            return combined_output
             
         except subprocess.CalledProcessError as e:
             logger.error(f"Failed to get logs for container {container_id}: {e.stderr}")
-            return f"Error retrieving logs: {e.stderr}"
+            return f"Error retrieving logs for container {container_id[:12]}...:\n{e.stderr}\n\nThis may happen if the container ID is invalid or the container has been removed."
+    
+    def get_container_logs_follow(self, container_id: str, lines: int = 50) -> str:
+        """Get recent logs with follow option for running containers"""
+        try:
+            # Use --follow for a short time to catch recent output, then timeout
+            import signal
+            import time
+            
+            # For running containers, try to get live logs
+            status = self.get_container_status(container_id)
+            if status.get('status') == 'running':
+                # Try to follow logs for 2 seconds to catch any recent output
+                process = subprocess.Popen(
+                    [self.container_runtime, 'logs', '--follow', '--tail', str(lines), container_id],
+                    stdout=subprocess.PIPE, 
+                    stderr=subprocess.STDOUT,
+                    text=True
+                )
+                
+                # Give it 2 seconds to collect logs
+                try:
+                    stdout, _ = process.communicate(timeout=2)
+                    return stdout if stdout else f"Container {container_id[:12]}... is running but no recent output captured.\nTry the regular 'View Logs' button or wait for the sync to produce output."
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    stdout, _ = process.communicate()
+                    return stdout if stdout else f"Container {container_id[:12]}... is running. Logs may be buffered.\nTry again in a moment or check if the sync process is actively running."
+            else:
+                # For non-running containers, fall back to regular logs
+                return self.get_container_logs(container_id, lines)
+                
+        except Exception as e:
+            logger.error(f"Failed to follow logs for container {container_id}: {e}")
+            return f"Error following logs: {e}"
     
     def list_running_containers(self) -> List[Dict[str, Any]]:
         try:
