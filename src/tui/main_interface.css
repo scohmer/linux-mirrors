@@ -108,7 +108,7 @@ Button.error {
 
 /* Modern progress display with better visual hierarchy */
 #sync-progress {
-    height: 1fr;
+    height: 8;
     border: round $panel;
     padding: 2;
     background: $surface;
@@ -117,12 +117,14 @@ Button.error {
 }
 
 #sync-progress:empty {
-    display: none;
+    height: 8;
+    content: "No sync in progress";
+    color: $text-muted;
 }
 
 /* Container table */
 #container-table {
-    height: 1fr;
+    height: 8;
     margin: 1 0;
 }
 
