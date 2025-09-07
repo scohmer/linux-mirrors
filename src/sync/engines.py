@@ -186,10 +186,11 @@ class YumSyncEngine(SyncEngine):
         repo_config = self._generate_yum_repo_config(version)
         config_file = f"/mirror/{repo_name}.repo"
         
-        # Get version-specific architectures
+        # Get version-specific architectures and repositories
         supported_archs = self._get_supported_architectures(version)
+        repositories = self._get_available_repositories(version)
         
-        # Create reposync command for each architecture using the config file
+        # Create reposync command for each repository and architecture
         commands = []
         createrepo_commands = []
         
@@ -198,32 +199,28 @@ class YumSyncEngine(SyncEngine):
         # Create temporary sync directory
         mkdir_commands.append("mkdir -p /tmp/sync")
         
+        # Create directories for all repositories and architectures
         for arch in supported_archs:
-            # Create BaseOS and AppStream directories for each architecture
-            mkdir_commands.append(f"mkdir -p /mirror/{version}/BaseOS/{arch}/os")
-            mkdir_commands.append(f"mkdir -p /mirror/{version}/AppStream/{arch}/os")
+            for repo_id, repo_info in repositories.items():
+                mkdir_commands.append(f"mkdir -p /mirror/{version}/{repo_info['path']}/{arch}/os")
         
+        # Generate sync commands for all repositories
         for arch in supported_archs:
             for mirror_url in self.dist_config.mirror_urls:
-                # BaseOS repository - sync to proper path
-                baseos_path = f"/mirror/{version}/BaseOS/{arch}/os"
-                baseos_tmp = f"/tmp/sync/{repo_name}-baseos-{arch}"
-                # Better error handling: check if sync succeeded and files exist before moving
-                cmd = f"dnf reposync --config={config_file} --repoid={repo_name}-baseos-{arch} --arch={arch} -p /tmp/sync --download-metadata && [ -d {baseos_tmp} ] && [ -n \"$(ls -A {baseos_tmp} 2>/dev/null)\" ] && mv {baseos_tmp}/* {baseos_path}/ && rm -rf {baseos_tmp}"
-                commands.append(cmd)
-                
-                # Create repository metadata for BaseOS (only if directory has content)
-                createrepo_commands.append(f"[ -n \"$(ls -A {baseos_path} 2>/dev/null)\" ] && createrepo_c {baseos_path} || echo \"Skipping createrepo for empty {baseos_path}\"")
-                
-                # AppStream repository - sync to proper path
-                appstream_path = f"/mirror/{version}/AppStream/{arch}/os"
-                appstream_tmp = f"/tmp/sync/{repo_name}-appstream-{arch}"
-                # Better error handling: check if sync succeeded and files exist before moving
-                appstream_cmd = f"dnf reposync --config={config_file} --repoid={repo_name}-appstream-{arch} --arch={arch} -p /tmp/sync --download-metadata && [ -d {appstream_tmp} ] && [ -n \"$(ls -A {appstream_tmp} 2>/dev/null)\" ] && mv {appstream_tmp}/* {appstream_path}/ && rm -rf {appstream_tmp}"
-                commands.append(appstream_cmd)
-                
-                # Create repository metadata for AppStream (only if directory has content)
-                createrepo_commands.append(f"[ -n \"$(ls -A {appstream_path} 2>/dev/null)\" ] && createrepo_c {appstream_path} || echo \"Skipping createrepo for empty {appstream_path}\"")
+                for repo_id, repo_info in repositories.items():
+                    repo_path = f"/mirror/{version}/{repo_info['path']}/{arch}/os"
+                    repo_tmp = f"/tmp/sync/{repo_name}-{repo_id}-{arch}"
+                    
+                    # Sync command with error handling
+                    cmd = f"dnf reposync --config={config_file} --repoid={repo_name}-{repo_id}-{arch} --arch={arch} -p /tmp/sync --download-metadata && [ -d {repo_tmp} ] && [ -n \"$(ls -A {repo_tmp} 2>/dev/null)\" ] && mv {repo_tmp}/* {repo_path}/ && rm -rf {repo_tmp}"
+                    commands.append(cmd)
+                    
+                    # Create repository metadata (only if directory has content)
+                    createrepo_commands.append(f"[ -n \"$(ls -A {repo_path} 2>/dev/null)\" ] && createrepo_c {repo_path} || echo \"Skipping createrepo for empty {repo_path}\"")
+        
+        # Add ISO download commands
+        iso_commands = self._generate_iso_download_commands(version, supported_archs)
+        commands.extend(iso_commands)
         
         # Escape the repo config for shell
         escaped_config = repo_config.replace('"', '\\"').replace('\n', '\\n')
@@ -255,6 +252,74 @@ class YumSyncEngine(SyncEngine):
         
         # For other distributions, return all architectures
         return all_archs
+
+    def _get_available_repositories(self, version: str) -> Dict[str, Dict[str, str]]:
+        """Get all available repositories for a specific version"""
+        if self.dist_config.name in ["rocky", "rhel"]:
+            if version == "8":
+                return {
+                    "baseos": {"name": "BaseOS", "path": "BaseOS"},
+                    "appstream": {"name": "AppStream", "path": "AppStream"},
+                    "powertools": {"name": "PowerTools", "path": "PowerTools"},
+                    "extras": {"name": "Extras", "path": "extras"},
+                    "devel": {"name": "Devel", "path": "Devel"},
+                    "plus": {"name": "Plus", "path": "plus"},
+                    "ha": {"name": "HighAvailability", "path": "HighAvailability"},
+                    "rs": {"name": "ResilientStorage", "path": "ResilientStorage"},
+                    "rt": {"name": "RT", "path": "RT"},
+                    "nfv": {"name": "NFV", "path": "NFV"}
+                }
+            elif version in ["9", "10"]:
+                repos = {
+                    "baseos": {"name": "BaseOS", "path": "BaseOS"},
+                    "appstream": {"name": "AppStream", "path": "AppStream"},
+                    "crb": {"name": "CRB", "path": "CRB"},
+                    "extras": {"name": "Extras", "path": "extras"},
+                    "devel": {"name": "Devel", "path": "devel"},
+                    "plus": {"name": "Plus", "path": "plus"},
+                    "ha": {"name": "HighAvailability", "path": "HighAvailability"},
+                    "rt": {"name": "RT", "path": "RT"},
+                    "nfv": {"name": "NFV", "path": "NFV"},
+                    "sap": {"name": "SAP", "path": "SAP"},
+                    "saphana": {"name": "SAPHANA", "path": "SAPHANA"}
+                }
+                # ResilientStorage only available in Rocky 9
+                if version == "9":
+                    repos["rs"] = {"name": "ResilientStorage", "path": "ResilientStorage"}
+                return repos
+        
+        # Default fallback for other distributions
+        return {
+            "baseos": {"name": "BaseOS", "path": "BaseOS"},
+            "appstream": {"name": "AppStream", "path": "AppStream"}
+        }
+
+    def _generate_iso_download_commands(self, version: str, supported_archs: List[str]) -> List[str]:
+        """Generate commands to download ISO images for YUM distributions"""
+        if self.dist_config.name not in ["rocky", "rhel"]:
+            return []
+        
+        iso_commands = []
+        
+        # Create ISO directory
+        iso_commands.append("mkdir -p /mirror/isos")
+        
+        for mirror_url in self.dist_config.mirror_urls:
+            for arch in supported_archs:
+                # Download boot ISOs and DVD ISOs
+                iso_base_url = f"{mirror_url}{version}/isos/{arch}/"
+                
+                # Common ISO patterns for Rocky Linux
+                iso_patterns = [
+                    f"Rocky-{version}*.iso",  # All ISOs for the version
+                ]
+                
+                for pattern in iso_patterns:
+                    # Use wget to download ISO files with pattern matching
+                    iso_cmd = f"wget -r -l1 -nd -A '{pattern}' -P /mirror/isos/ {iso_base_url} || echo 'No ISOs found for {arch} or download failed'"
+                    iso_commands.append(iso_cmd)
+        
+        return iso_commands
     
     def _generate_yum_repo_config(self, version: str) -> str:
         repo_name = f"{self.dist_config.name}-{version}"
@@ -263,27 +328,20 @@ class YumSyncEngine(SyncEngine):
         # Get version-specific architectures
         supported_archs = self._get_supported_architectures(version)
         
+        # Define all available repositories by version
+        repositories = self._get_available_repositories(version)
+        
         for arch in supported_archs:
             for mirror_url in self.dist_config.mirror_urls:
-                # BaseOS repository
-                config_lines.extend([
-                    f"[{repo_name}-baseos-{arch}]",
-                    f"name={self.dist_config.name.title()} {version} - BaseOS ({arch})",
-                    f"baseurl={mirror_url}{version}/BaseOS/{arch}/os/",
-                    "enabled=1",
-                    "gpgcheck=0",  # Disable gpgcheck for now to avoid key issues
-                    ""  # Empty line between sections
-                ])
-                
-                # AppStream repository
-                config_lines.extend([
-                    f"[{repo_name}-appstream-{arch}]",
-                    f"name={self.dist_config.name.title()} {version} - AppStream ({arch})",
-                    f"baseurl={mirror_url}{version}/AppStream/{arch}/os/",
-                    "enabled=1", 
-                    "gpgcheck=0",  # Disable gpgcheck for now to avoid key issues
-                    ""  # Empty line between sections
-                ])
+                for repo_id, repo_info in repositories.items():
+                    config_lines.extend([
+                        f"[{repo_name}-{repo_id}-{arch}]",
+                        f"name={self.dist_config.name.title()} {version} - {repo_info['name']} ({arch})",
+                        f"baseurl={mirror_url}{version}/{repo_info['path']}/{arch}/os/",
+                        "enabled=1",
+                        "gpgcheck=0",  # Disable gpgcheck for now to avoid key issues
+                        ""  # Empty line between sections
+                    ])
         
         return "\n".join(config_lines)
     
