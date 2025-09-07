@@ -207,21 +207,23 @@ class YumSyncEngine(SyncEngine):
             for mirror_url in self.dist_config.mirror_urls:
                 # BaseOS repository - sync to proper path
                 baseos_path = f"/mirror/{version}/BaseOS/{arch}/os"
-                # reposync creates a subdirectory with repo name, so we sync to parent and then move
-                cmd = f"dnf reposync --config={config_file} --repoid={repo_name}-baseos-{arch} --arch={arch} -p /tmp/sync --download-metadata && mv /tmp/sync/{repo_name}-baseos-{arch}/* {baseos_path}/ && rm -rf /tmp/sync/{repo_name}-baseos-{arch}"
+                baseos_tmp = f"/tmp/sync/{repo_name}-baseos-{arch}"
+                # Better error handling: check if sync succeeded and files exist before moving
+                cmd = f"dnf reposync --config={config_file} --repoid={repo_name}-baseos-{arch} --arch={arch} -p /tmp/sync --download-metadata && [ -d {baseos_tmp} ] && [ -n \"$(ls -A {baseos_tmp} 2>/dev/null)\" ] && mv {baseos_tmp}/* {baseos_path}/ && rm -rf {baseos_tmp}"
                 commands.append(cmd)
                 
-                # Create repository metadata for BaseOS
-                createrepo_commands.append(f"createrepo_c {baseos_path}")
+                # Create repository metadata for BaseOS (only if directory has content)
+                createrepo_commands.append(f"[ -n \"$(ls -A {baseos_path} 2>/dev/null)\" ] && createrepo_c {baseos_path} || echo \"Skipping createrepo for empty {baseos_path}\"")
                 
                 # AppStream repository - sync to proper path
                 appstream_path = f"/mirror/{version}/AppStream/{arch}/os"
-                # reposync creates a subdirectory with repo name, so we sync to parent and then move
-                appstream_cmd = f"dnf reposync --config={config_file} --repoid={repo_name}-appstream-{arch} --arch={arch} -p /tmp/sync --download-metadata && mv /tmp/sync/{repo_name}-appstream-{arch}/* {appstream_path}/ && rm -rf /tmp/sync/{repo_name}-appstream-{arch}"
+                appstream_tmp = f"/tmp/sync/{repo_name}-appstream-{arch}"
+                # Better error handling: check if sync succeeded and files exist before moving
+                appstream_cmd = f"dnf reposync --config={config_file} --repoid={repo_name}-appstream-{arch} --arch={arch} -p /tmp/sync --download-metadata && [ -d {appstream_tmp} ] && [ -n \"$(ls -A {appstream_tmp} 2>/dev/null)\" ] && mv {appstream_tmp}/* {appstream_path}/ && rm -rf {appstream_tmp}"
                 commands.append(appstream_cmd)
                 
-                # Create repository metadata for AppStream
-                createrepo_commands.append(f"createrepo_c {appstream_path}")
+                # Create repository metadata for AppStream (only if directory has content)
+                createrepo_commands.append(f"[ -n \"$(ls -A {appstream_path} 2>/dev/null)\" ] && createrepo_c {appstream_path} || echo \"Skipping createrepo for empty {appstream_path}\"")
         
         # Escape the repo config for shell
         escaped_config = repo_config.replace('"', '\\"').replace('\n', '\\n')
@@ -244,9 +246,12 @@ class YumSyncEngine(SyncEngine):
             if version == "8":
                 # Rocky/RHEL 8 only supports x86_64 and aarch64
                 return [arch for arch in all_archs if arch in ["x86_64", "aarch64"]]
-            elif version in ["9", "10"]:
-                # Rocky/RHEL 9 and 10 support all listed architectures
-                return all_archs
+            elif version == "9":
+                # Rocky/RHEL 9 supports x86_64, aarch64, ppc64le, s390x
+                return [arch for arch in all_archs if arch in ["x86_64", "aarch64", "ppc64le", "s390x"]]
+            elif version == "10":
+                # Rocky/RHEL 10 supports x86_64, aarch64, ppc64le, s390x, riscv64
+                return [arch for arch in all_archs if arch in ["x86_64", "aarch64", "ppc64le", "s390x", "riscv64"]]
         
         # For other distributions, return all architectures
         return all_archs
