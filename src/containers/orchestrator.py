@@ -160,9 +160,10 @@ VOLUME ["/mirror"]
                 '--env', 'MIRROR_PATH=/mirror',
             ]
             
-            # Add RHEL-specific credential mounts
+            # Add RHEL-specific credential mounts and root user
             if dist_config.name == "rhel":
                 create_cmd.extend([
+                    '--user', 'root',  # RHEL sync requires root for dnf operations
                     '--volume', '/etc/pki/entitlement:/etc/pki/entitlement:ro',
                     '--volume', '/etc/rhsm/rhsm.conf:/etc/rhsm/rhsm.conf:ro',
                 ])
