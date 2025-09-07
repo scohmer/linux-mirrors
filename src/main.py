@@ -317,7 +317,13 @@ async def main():
                 print("Debug command requires interactive mode")
                 return 1
             
-            debug_app = DebugInterface()
+            from textual.app import App
+            
+            class DebugApp(App):
+                def on_mount(self):
+                    self.push_screen(DebugInterface())
+            
+            debug_app = DebugApp()
             await debug_app.run_async()
             return 0
         
