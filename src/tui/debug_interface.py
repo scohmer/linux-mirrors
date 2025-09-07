@@ -34,7 +34,7 @@ class LogViewer(Container):
             yield Button("Refresh", id="refresh-containers", variant="default")
         
         self.log_display = TextArea("", read_only=True, id="log-content")
-        self.log_display.styles.height = "80%"
+        self.log_display.styles.height = "70%"
         yield self.log_display
     
     def on_mount(self):
