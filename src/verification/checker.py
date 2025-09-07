@@ -93,6 +93,38 @@ class RepositoryVerifier:
                 'files_corrupted': 0
             }
     
+    def _get_available_architectures(self, dist_name: str, version: str, configured_archs: List[str]) -> List[str]:
+        """Get architectures that were actually available for a specific distribution version"""
+        if dist_name == 'debian':
+            # Debian architecture availability by version
+            if version == 'wheezy':  # Debian 7 (2013)
+                # wheezy had limited architecture support
+                available_archs = ['amd64', 'i386', 'armhf']
+            elif version == 'jessie':  # Debian 8 (2015) 
+                # jessie introduced arm64 but still limited
+                available_archs = ['amd64', 'i386', 'armhf', 'arm64']
+            elif version in ['stretch', 'buster']:  # Debian 9-10 (2017-2019)
+                # Full architecture support
+                available_archs = ['amd64', 'i386', 'armhf', 'arm64']
+            else:  # bullseye, bookworm, etc. (Debian 11+)
+                # All architectures available
+                available_archs = ['amd64', 'i386', 'armhf', 'arm64']
+            
+            # Filter configured architectures by what's actually available
+            return [arch for arch in configured_archs if arch in available_archs]
+        
+        elif dist_name == 'ubuntu':
+            # Ubuntu architecture availability (similar logic can be added)
+            if version in ['18.04', '20.04']:
+                available_archs = ['amd64', 'i386', 'armhf', 'arm64']  
+            else:
+                available_archs = ['amd64', 'i386', 'armhf', 'arm64']
+            
+            return [arch for arch in configured_archs if arch in available_archs]
+        
+        # For other distributions or unknown versions, use all configured architectures
+        return configured_archs
+
     def _verify_apt_repository(self, dist_name: str, version: str, dist_config: DistributionConfig, repo_path: str) -> Dict[str, Any]:
         """Verify APT repository by checking Release file and key packages"""
         files_checked = 0
@@ -133,8 +165,11 @@ class RepositoryVerifier:
                 details.append(f'Error reading Release file: {e}')
         
         # Check for component directories and key files
+        # Get architectures that were actually available for this distribution version
+        available_architectures = self._get_available_architectures(dist_name, version, dist_config.architectures or ['amd64'])
+        
         for component in dist_config.components or ['main']:
-            for arch in dist_config.architectures or ['amd64']:
+            for arch in available_architectures:
                 # Check Packages file
                 packages_path = os.path.join(dists_path, component, f'binary-{arch}', 'Packages.gz')
                 files_checked += 1
