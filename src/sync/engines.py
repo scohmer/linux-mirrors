@@ -597,13 +597,16 @@ class SyncManager:
                     yum_distributions[dist_name] = versions
         
         # Start YUM distributions in parallel immediately (don't wait for APT)
+        # Create individual tasks for each distribution+version combination
         yum_tasks = []
         if yum_distributions:
             logger.info(f"Starting YUM distributions in parallel: {list(yum_distributions.keys())}")
             for dist_name, versions in yum_distributions.items():
                 dist_config = self.orchestrator.config_manager.get_config().distributions[dist_name]
-                task = asyncio.create_task(self.sync_distribution(dist_config, versions))
-                yum_tasks.append(task)
+                # Create a separate task for each version to allow true parallelism
+                for version in versions:
+                    task = asyncio.create_task(self.sync_distribution(dist_config, [version]))
+                    yum_tasks.append(task)
             
             # Give YUM tasks a chance to start before APT begins
             await asyncio.sleep(0.1)
