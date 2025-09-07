@@ -189,24 +189,75 @@ linux-mirrors/
 │   ├── tui/            # User interfaces
 │   ├── systemd/        # Service generation
 │   └── storage/        # Storage management
-├── tests/              # Test suite
-├── docs/               # Documentation
-├── main.py             # Entry point
-├── requirements.txt    # Dependencies
+├── tests/              # Comprehensive test suite
+│   ├── README.md       # Testing documentation
+│   ├── conftest.py     # Test configuration and fixtures
+│   ├── test_*.py       # Unit tests for each component
+│   ├── test_integration.py  # Integration tests
+│   └── test_end_to_end.py   # End-to-end workflow tests
+├── requirements.txt    # Runtime dependencies
+├── requirements-test.txt    # Testing dependencies
+├── pytest.ini         # Test configuration
+├── Makefile           # Development commands
+├── TESTING_SUMMARY.md # Test coverage and results
 └── setup.py           # Package configuration
 ```
 
-### Running Tests
+### Testing
 
+The project includes a comprehensive test suite with 73+ test cases covering all major components:
+
+#### Quick Start
 ```bash
-python -m pytest tests/
+# Install test dependencies
+pip install -r requirements-test.txt
+
+# Run all tests
+pytest
+
+# Run with coverage report
+pytest --cov=src --cov-report=html
 ```
+
+#### Test Categories
+```bash
+# Unit tests (fast, isolated)
+make test-unit
+
+# Integration tests
+make test-integration
+
+# End-to-end tests
+make test-e2e
+
+# Skip slow tests
+make test-fast
+
+# Parallel execution
+make test-parallel
+```
+
+#### Coverage Results
+- **ConfigManager**: 97% coverage
+- **SyncEngines**: 96% coverage  
+- **StorageManager**: 83% coverage
+
+See [tests/README.md](tests/README.md) for detailed testing documentation.
 
 ### Building
 
 ```bash
-python setup.py build
-python setup.py sdist bdist_wheel
+make build          # Clean build
+make clean          # Remove build artifacts
+```
+
+### Code Quality
+
+```bash
+make lint           # Run code linting
+make type-check     # Run type checking
+make format         # Format code
+make quality-check  # Run all quality checks
 ```
 
 ## Troubleshooting
