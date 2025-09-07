@@ -289,7 +289,13 @@ class DebugInterface(Screen):
     
     def on_button_pressed(self, event: Button.Pressed):
         if event.button.id == "back-main":
-            self.dismiss()
+            # Check if there are other screens in the stack
+            if len(self.app.screen_stack) > 1:
+                # There's a main screen underneath, go back to it
+                self.dismiss()
+            else:
+                # This is the only screen (standalone mode), exit the app
+                self.app.exit()
         elif event.button.id == "export-logs":
             self.export_debug_logs()
         elif event.button.id == "system-info":
