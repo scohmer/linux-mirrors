@@ -340,14 +340,15 @@ class DebugInterface(Screen):
                 with Vertical(id="debug-left-panel"):
                     yield ContainerManager(self.orchestrator)
                     yield StorageInfo(self.config_manager)
+                    
+                    # Move action buttons to left panel only
+                    with Horizontal(id="debug-actions"):
+                        yield Button("Back to Main", id="back-main", variant="primary")
+                        yield Button("Export Logs", id="export-logs", variant="default")
+                        yield Button("System Info", id="system-info", variant="default")
                 
                 with Vertical(id="debug-right-panel"):
                     yield LogViewer(self.orchestrator)
-            
-            with Horizontal(id="debug-actions"):
-                yield Button("Back to Main", id="back-main", variant="primary")
-                yield Button("Export Logs", id="export-logs", variant="default")
-                yield Button("System Info", id="system-info", variant="default")
         
         yield Footer()
     

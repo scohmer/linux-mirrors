@@ -18,8 +18,7 @@
     padding: 1;
     background: $surface;
     border: round $panel;
-    overflow-y: auto;
-    max-height: 100vh;
+    height: 100vh;
 }
 
 #debug-right-panel {
@@ -28,15 +27,16 @@
     padding: 1;
     background: $surface;
     border: round $panel;
-    min-height: 100vh;
+    height: 100vh;
+    overflow-y: auto;
 }
 
 #debug-actions {
-    height: 5;
-    margin: 1 0;
+    height: 4;
+    margin: 1 0 0 0;
     padding: 1;
     background: $panel 30%;
-    border: round $secondary;
+    border: round $panel;
 }
 
 /* Modern section headers with muted styling */
@@ -52,7 +52,7 @@
 
 /* Container management */
 #debug-container-table {
-    height: 15;
+    height: 8;
     margin: 1 0;
     border: round $panel;
     background: $surface;
@@ -60,7 +60,7 @@
 
 /* Storage table */
 #storage-table {
-    height: 10;
+    height: 6;
     margin: 1 0;
     border: round $panel;
     background: $surface;
@@ -87,6 +87,7 @@
 Button {
     margin: 0 1;
     min-width: 10;
+    height: 3;
     border: round $primary;
     text-style: bold;
 }
