@@ -117,6 +117,20 @@ class AptSyncEngine(SyncEngine):
             '''
         ]
     
+    def _get_version_specific_urls(self, version: str) -> List[str]:
+        """Get appropriate mirror URLs based on version for distribution-specific handling"""
+        # Special handling for Debian archived versions
+        if self.dist_config.name == "debian":
+            archived_versions = ["wheezy", "jessie", "stretch", "buster"]
+            if version in archived_versions:
+                return ["http://archive.debian.org/debian/"]
+            else:
+                # Use current Debian mirrors for bullseye, bookworm, trixie, etc.
+                return self.dist_config.mirror_urls
+        
+        # For other distributions, use configured mirror URLs
+        return self.dist_config.mirror_urls
+
     def _generate_apt_mirror_config(self, version: str) -> str:
         base_path = "/mirror"
         config_lines = [
@@ -133,8 +147,11 @@ class AptSyncEngine(SyncEngine):
             ""
         ]
         
+        # Get version-specific mirror URLs
+        mirror_urls = self._get_version_specific_urls(version)
+        
         # Add repository lines for each architecture
-        for mirror_url in self.dist_config.mirror_urls:
+        for mirror_url in mirror_urls:
             for arch in self.dist_config.architectures:
                 components = " ".join(self.dist_config.components)
                 repo_line = f"deb-{arch} {mirror_url} {version} {components}"
@@ -147,7 +164,9 @@ class AptSyncEngine(SyncEngine):
                 config_lines.append(src_line)
         
         config_lines.append("")
-        config_lines.append("clean http://deb.debian.org/debian")
+        # Use appropriate clean URL based on version
+        clean_url = mirror_urls[0] if mirror_urls else "http://deb.debian.org/debian/"
+        config_lines.append(f"clean {clean_url}")
         
         return "\n".join(config_lines)  # Fix: use actual newlines
     
