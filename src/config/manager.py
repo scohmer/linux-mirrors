@@ -94,14 +94,14 @@ class MirrorConfig:
                 type="yum",
                 versions=["8", "9", "10"],
                 mirror_urls=["https://dl.rockylinux.org/pub/rocky/"],
-                architectures=["x86_64", "aarch64", "ppc64le", "s390x", "riscv64"]
+                architectures=["x86_64"]
             ),
             "rhel": DistributionConfig(
                 name="rhel",
                 type="yum",
                 versions=["8", "9", "10"],
                 mirror_urls=["https://cdn.redhat.com/content/dist/rhel/"],
-                architectures=["x86_64", "aarch64", "ppc64le", "s390x", "riscv64"],
+                architectures=["x86_64"],
                 enabled=True  # Enable RHEL in TUI (requires subscription)
             )
         }
