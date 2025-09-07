@@ -163,8 +163,8 @@ VOLUME ["/mirror"]
             # Add RHEL-specific credential mounts
             if dist_config.name == "rhel":
                 create_cmd.extend([
-                    '--volume', '/etc/pki/entitlement:/etc/pki/entitlement:ro,z',
-                    '--volume', '/etc/rhsm/rhsm.conf:/etc/rhsm/rhsm.conf:ro,z',
+                    '--volume', '/etc/pki/entitlement:/etc/pki/entitlement:ro',
+                    '--volume', '/etc/rhsm/rhsm.conf:/etc/rhsm/rhsm.conf:ro',
                 ])
             
             create_cmd.extend([image_tag] + command)
