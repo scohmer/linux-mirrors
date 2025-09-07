@@ -102,7 +102,7 @@ Button.default {
 }
 
 Button.primary {
-    background: $accent;
+    background: $primary;
     color: $text;
 }
 
@@ -121,7 +121,7 @@ Button.error {
     color: $text;
 }
 
-/* Modern tables with better visual hierarchy */
+/* Modern tables with muted visual hierarchy */
 DataTable {
     border: round $panel;
     background: $surface;
@@ -129,14 +129,14 @@ DataTable {
 }
 
 DataTable > .datatable--header {
-    background: $accent 15%;
+    background: $panel 70%;
     color: $text;
     text-style: bold;
-    border-bottom: hkey $primary;
+    border-bottom: hkey $panel;
 }
 
 DataTable > .datatable--odd-row {
-    background: $panel 50%;
+    background: $panel 30%;
 }
 
 DataTable > .datatable--even-row {
@@ -144,7 +144,7 @@ DataTable > .datatable--even-row {
 }
 
 DataTable > .datatable--cursor {
-    background: $accent 25%;
+    background: $primary 30%;
     color: $text;
 }
 
@@ -185,18 +185,21 @@ Select:focus {
     background: $surface;
 }
 
-/* Modern status indicators with card design */
+/* Modern status indicators with muted card design */
 #storage-summary {
     margin: 2 0;
     padding: 2;
-    background: $panel 70%;
+    background: $panel 40%;
     border: round $panel;
-    border-left: thick $success;
+    border-left: thick $primary 50%;
+    color: $text;
 }
 
 /* Action panels with modern styling */
 #debug-actions {
-    background: $panel 20%;
+    background: $panel 30%;
     border: round $panel;
     padding: 1;
+    margin-bottom: 2;
+    dock: bottom;
 }
