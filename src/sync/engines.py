@@ -506,8 +506,8 @@ class SyncManager:
         self._engines: Dict[str, SyncEngine] = {}
         # APT-mirror can't handle concurrent access, so limit to 1
         self._apt_semaphore = asyncio.Semaphore(1)
-        # YUM repos can run in parallel
-        self._yum_semaphore = asyncio.Semaphore(3)
+        # YUM repos can run in parallel - allow enough slots for all YUM versions
+        self._yum_semaphore = asyncio.Semaphore(10)
     
     def get_engine(self, dist_config: DistributionConfig) -> SyncEngine:
         engine_key = f"{dist_config.name}-{dist_config.type}"
