@@ -153,13 +153,15 @@ class AptSyncEngine(SyncEngine):
         # Add main repository lines
         components = " ".join(self.dist_config.components)
         for mirror_url in mirror_urls:
+            # Normalize URL by removing trailing slash for apt-mirror compatibility
+            normalized_url = mirror_url.rstrip('/')
             for arch in self.dist_config.architectures:
-                repo_line = f"deb-{arch} {mirror_url} {version} {components}"
+                repo_line = f"deb-{arch} {normalized_url} {version} {components}"
                 config_lines.append(repo_line)
             
             # Add source packages if enabled
             if getattr(self.dist_config, 'include_source_packages', False):
-                src_line = f"deb-src {mirror_url} {version} {components}"
+                src_line = f"deb-src {normalized_url} {version} {components}"
                 config_lines.append(src_line)
         
         # Add Debian-specific security and backports repositories
@@ -183,12 +185,13 @@ class AptSyncEngine(SyncEngine):
                     security_suite = f"{version}-security"
                 
                 # Add security repository lines
+                normalized_security_url = security_url.rstrip('/')
                 for arch in self.dist_config.architectures:
-                    security_line = f"deb-{arch} {security_url} {security_suite} {components}"
+                    security_line = f"deb-{arch} {normalized_security_url} {security_suite} {components}"
                     config_lines.append(security_line)
                 
                 if getattr(self.dist_config, 'include_source_packages', False):
-                    security_src = f"deb-src {security_url} {security_suite} {components}"
+                    security_src = f"deb-src {normalized_security_url} {security_suite} {components}"
                     config_lines.append(security_src)
             
             # Backports repository (skip for very old versions that didn't have backports)
@@ -203,12 +206,13 @@ class AptSyncEngine(SyncEngine):
                 backports_suite = f"{version}-backports"
                 
                 # Add backports repository lines
+                normalized_backports_url = backports_url.rstrip('/')
                 for arch in self.dist_config.architectures:
-                    backports_line = f"deb-{arch} {backports_url} {backports_suite} {components}"
+                    backports_line = f"deb-{arch} {normalized_backports_url} {backports_suite} {components}"
                     config_lines.append(backports_line)
                 
                 if getattr(self.dist_config, 'include_source_packages', False):
-                    backports_src = f"deb-src {backports_url} {backports_suite} {components}"
+                    backports_src = f"deb-src {normalized_backports_url} {backports_suite} {components}"
                     config_lines.append(backports_src)
         
         config_lines.append("")
