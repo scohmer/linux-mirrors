@@ -281,8 +281,8 @@ class YumSyncEngine(SyncEngine):
                     
                     # RHEL sync command with entitlement authentication
                     cmd = f"""
-                    echo "Installing dnf-plugins-core for RHEL sync..." &&
-                    dnf install -y dnf-plugins-core &&
+                    echo "Installing required packages for RHEL sync..." &&
+                    dnf install -y dnf-plugins-core rsync &&
                     echo "Starting RHEL sync for {repo_id} {arch}..." &&
                     dnf reposync --config={config_file} --repoid=rhel-{version}-{repo_id.lower()}-rpms-{arch} --arch={arch} -p /tmp/sync --download-metadata --verbose 2>&1 &&
                     echo "Sync completed, checking results..." &&
@@ -291,9 +291,8 @@ class YumSyncEngine(SyncEngine):
                         echo "Found sync directory {repo_tmp}" &&
                         ls -la {repo_tmp}/ &&
                         if [ -n "$(ls -A {repo_tmp} 2>/dev/null)" ]; then
-                            echo "Moving files to {repo_path}..." &&
-                            rm -rf {repo_path}/* &&
-                            mv {repo_tmp}/* {repo_path}/ &&
+                            echo "Syncing files to {repo_path} with rsync..." &&
+                            rsync -av --delete-after {repo_tmp}/ {repo_path}/ &&
                             rm -rf {repo_tmp} &&
                             echo "Successfully synced {repo_id} {arch}"
                         else
@@ -317,6 +316,8 @@ class YumSyncEngine(SyncEngine):
                         
                         # Standard sync command
                         cmd = f"""
+                        echo "Installing rsync for safe file transfers..." &&
+                        dnf install -y rsync &&
                         echo "Starting sync for {repo_id} {arch}..." &&
                         dnf reposync --config={config_file} --repoid={repo_name}-{repo_id}-{arch} --arch={arch} -p /tmp/sync --download-metadata --verbose 2>&1 &&
                     echo "Sync completed, checking results..." &&
@@ -325,9 +326,8 @@ class YumSyncEngine(SyncEngine):
                         echo "Found sync directory {repo_tmp}" &&
                         ls -la {repo_tmp}/ &&
                         if [ -n "$(ls -A {repo_tmp} 2>/dev/null)" ]; then
-                            echo "Moving files to {repo_path}..." &&
-                            rm -rf {repo_path}/* &&
-                            mv {repo_tmp}/* {repo_path}/ &&
+                            echo "Syncing files to {repo_path} with rsync..." &&
+                            rsync -av --delete-after {repo_tmp}/ {repo_path}/ &&
                             rm -rf {repo_tmp} &&
                             echo "Successfully synced {repo_id} {arch}"
                         else
