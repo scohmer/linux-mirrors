@@ -284,7 +284,7 @@ class YumSyncEngine(SyncEngine):
                     echo "Installing required packages for RHEL sync..." &&
                     dnf install -y dnf-plugins-core rsync &&
                     echo "Starting RHEL sync for {repo_id} {arch}..." &&
-                    dnf reposync --config={config_file} --repoid=rhel-{version}-{repo_id.lower()}-rpms-{arch} --arch={arch} -p /tmp/sync --download-metadata --verbose 2>&1 &&
+                    dnf reposync --config={config_file} --repoid=rhel-{version}-{repo_id.lower()}-rpms-{arch} --arch={arch} -p /tmp/sync --download-metadata --downloadcomps --newest-only --verbose 2>&1 &&
                     echo "Sync completed, checking results..." &&
                     ls -la /tmp/sync/ &&
                     if [ -d {repo_tmp} ]; then
@@ -319,7 +319,7 @@ class YumSyncEngine(SyncEngine):
                         echo "Installing rsync for safe file transfers..." &&
                         dnf install -y rsync &&
                         echo "Starting sync for {repo_id} {arch}..." &&
-                        dnf reposync --config={config_file} --repoid={repo_name}-{repo_id}-{arch} --arch={arch} -p /tmp/sync --download-metadata --verbose 2>&1 &&
+                        dnf reposync --config={config_file} --repoid={repo_name}-{repo_id}-{arch} --arch={arch} -p /tmp/sync --download-metadata --downloadcomps --newest-only --verbose 2>&1 &&
                     echo "Sync completed, checking results..." &&
                     ls -la /tmp/sync/ &&
                     if [ -d {repo_tmp} ]; then
