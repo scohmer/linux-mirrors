@@ -22,6 +22,8 @@ class DistributionConfig:
     include_source_packages: bool = False
     gpg_key_urls: List[str] = None
     installer_image_urls: List[str] = None
+    # ISO download configuration
+    iso_architectures: List[str] = None  # Architectures to download ISOs for
     # Proxy configuration (per-distribution)
     http_proxy: str = None
     https_proxy: str = None
@@ -103,7 +105,8 @@ class MirrorConfig:
                 versions=["8", "9", "10"],
                 mirror_urls=["https://dl.rockylinux.org/pub/rocky/"],
                 components=["BaseOS", "AppStream", "PowerTools", "CRB", "extras", "devel", "plus", "HighAvailability", "ResilientStorage", "RT", "NFV", "SAP", "SAPHANA"],
-                architectures=["x86_64"]
+                architectures=["x86_64"],
+                iso_architectures=["x86_64", "aarch64"]
             ),
             "rhel": DistributionConfig(
                 name="rhel",
@@ -112,6 +115,7 @@ class MirrorConfig:
                 mirror_urls=["https://cdn.redhat.com/content/dist/rhel/"],
                 components=["BaseOS", "AppStream", "PowerTools", "CRB", "extras", "devel", "plus", "HighAvailability", "ResilientStorage", "RT", "NFV", "SAP", "SAPHANA"],
                 architectures=["x86_64"],
+                iso_architectures=["x86_64", "aarch64"],
                 enabled=True  # Enable RHEL in TUI (requires subscription)
             )
         }
@@ -233,6 +237,10 @@ distributions:
             if dist_config.get('architectures'):
                 template += f"    architectures:\n"
                 for arch in dist_config['architectures']:
+                    template += f"    - {arch}\n"
+            if dist_config.get('iso_architectures'):
+                template += f"    iso_architectures:\n"
+                for arch in dist_config['iso_architectures']:
                     template += f"    - {arch}\n"
             template += f"    sync_schedule: {dist_config['sync_schedule']}\n"
             template += f"    include_gpg_keys: {str(dist_config['include_gpg_keys']).lower()}\n"

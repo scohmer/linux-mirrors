@@ -342,7 +342,7 @@ class YumSyncEngine(SyncEngine):
                     createrepo_commands.append(f"[ -n \"$(ls -A {repo_path} 2>/dev/null)\" ] && createrepo_c {repo_path} || echo \"Skipping createrepo for empty {repo_path}\"")
         
         # Add ISO download commands
-        iso_commands = self._generate_iso_download_commands(version, supported_archs)
+        iso_commands = self._generate_iso_download_commands(version)
         commands.extend(iso_commands)
         
         # Escape the repo config for shell
@@ -443,9 +443,14 @@ class YumSyncEngine(SyncEngine):
         
         return repositories
 
-    def _generate_iso_download_commands(self, version: str, supported_archs: List[str]) -> List[str]:
+    def _generate_iso_download_commands(self, version: str) -> List[str]:
         """Generate commands to download ISO images for YUM distributions"""
         if self.dist_config.name not in ["rocky", "rhel"]:
+            return []
+        
+        # Use configured ISO architectures or fall back to repository architectures
+        iso_archs = getattr(self.dist_config, 'iso_architectures', None) or self.dist_config.architectures
+        if not iso_archs:
             return []
         
         iso_commands = []
@@ -454,14 +459,21 @@ class YumSyncEngine(SyncEngine):
         iso_commands.append("mkdir -p /mirror/isos && chmod 777 /mirror/isos")
         
         for mirror_url in self.dist_config.mirror_urls:
-            for arch in supported_archs:
+            for arch in iso_archs:
                 # Download boot ISOs and DVD ISOs
                 iso_base_url = f"{mirror_url}{version}/isos/{arch}/"
                 
-                # Common ISO patterns for Rocky Linux
-                iso_patterns = [
-                    f"Rocky-{version}*.iso",  # All ISOs for the version
-                ]
+                # Common ISO patterns for Rocky Linux and RHEL
+                if self.dist_config.name == "rocky":
+                    iso_patterns = [
+                        f"Rocky-{version}*.iso",  # All ISOs for the version
+                    ]
+                elif self.dist_config.name == "rhel":
+                    iso_patterns = [
+                        f"rhel-{version}*.iso",  # All ISOs for the version
+                    ]
+                else:
+                    iso_patterns = [f"*.iso"]  # Generic fallback
                 
                 for pattern in iso_patterns:
                     # Use wget to download ISO files with pattern matching
