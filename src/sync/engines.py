@@ -473,38 +473,40 @@ class YumSyncEngine(SyncEngine):
         commands = []
         
         if self.dist_config.name == "rocky":
-            # Rocky Linux uses a single CHECKSUM file
+            # Rocky Linux uses a single CHECKSUM file - create a proper shell script
             checksum_url = f"{iso_base_url}CHECKSUM"
-            commands.extend([
-                f"echo 'Downloading checksum file for Rocky {version} {arch}...'",
-                f"wget -q -O /tmp/CHECKSUM_{version}_{arch} {checksum_url} || echo 'Warning: Could not download CHECKSUM file'",
-                f"if [ -f /tmp/CHECKSUM_{version}_{arch} ]; then",
-                f"  echo 'Processing checksums for Rocky {version} {arch}...'",
-                # Parse CHECKSUM file and verify each ISO
-                f"  while IFS=' ' read -r checksum filename; do",
-                f"    if [[ \"$filename\" == *\".iso\" ]]; then",
-                f"      local_file=\"/mirror/isos/$filename\"",
-                f"      if [ -f \"$local_file\" ]; then",
-                f"        echo \"Verifying existing ISO: $filename\"",
-                f"        local_checksum=$(sha256sum \"$local_file\" | cut -d' ' -f1)",
-                f"        if [ \"$local_checksum\" = \"$checksum\" ]; then",
-                f"          echo \"✓ $filename: Checksum matches, skipping download\"",
-                f"        else",
-                f"          echo \"✗ $filename: Checksum mismatch, re-downloading\"",
-                f"          wget -O \"$local_file\" \"{iso_base_url}$filename\" || echo \"Failed to download $filename\"",
-                f"        fi",
-                f"      else",
-                f"        echo \"Downloading new ISO: $filename\"",
-                f"        wget -O \"$local_file\" \"{iso_base_url}$filename\" || echo \"Failed to download $filename\"",
-                f"      fi",
-                f"    fi",
-                f"  done < /tmp/CHECKSUM_{version}_{arch}",
-                f"  rm -f /tmp/CHECKSUM_{version}_{arch}",
-                f"else",
-                f"  echo 'Falling back to pattern-based download without verification'",
-                f"  wget -r -l1 -nd -A 'Rocky-{version}*.iso' -P /mirror/isos/ {iso_base_url} || echo 'No ISOs found for {arch} or download failed'",
-                f"fi"
-            ])
+            
+            # Create a shell script for checksum verification
+            verification_script = f'''
+echo 'Downloading checksum file for Rocky {version} {arch}...'
+if wget -q -O /tmp/CHECKSUM_{version}_{arch} {checksum_url}; then
+  echo 'Processing checksums for Rocky {version} {arch}...'
+  while IFS=' ' read -r checksum filename; do
+    if [[ "$filename" == *".iso" ]]; then
+      local_file="/mirror/isos/$filename"
+      if [ -f "$local_file" ]; then
+        echo "Verifying existing ISO: $filename"
+        local_checksum=$(sha256sum "$local_file" | cut -d' ' -f1)
+        if [ "$local_checksum" = "$checksum" ]; then
+          echo "✓ $filename: Checksum matches, skipping download"
+        else
+          echo "✗ $filename: Checksum mismatch, re-downloading"
+          wget -O "$local_file" "{iso_base_url}$filename" || echo "Failed to download $filename"
+        fi
+      else
+        echo "Downloading new ISO: $filename"
+        wget -O "$local_file" "{iso_base_url}$filename" || echo "Failed to download $filename"
+      fi
+    fi
+  done < /tmp/CHECKSUM_{version}_{arch}
+  rm -f /tmp/CHECKSUM_{version}_{arch}
+else
+  echo 'Warning: Could not download CHECKSUM file, falling back to pattern-based download'
+  wget -r -l1 -nd -A 'Rocky-{version}*.iso' -P /mirror/isos/ {iso_base_url} || echo 'No ISOs found for {arch} or download failed'
+fi
+            '''.strip()
+            
+            commands.append(verification_script)
         
         elif self.dist_config.name == "rhel":
             # RHEL may not have public CHECKSUM files, use timestamp-based checking
