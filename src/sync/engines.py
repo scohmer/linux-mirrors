@@ -218,7 +218,8 @@ class AptSyncEngine(SyncEngine):
         config_lines.append("")
         # Use appropriate clean URL based on version
         clean_url = mirror_urls[0] if mirror_urls else "http://deb.debian.org/debian/"
-        config_lines.append(f"clean {clean_url}")
+        normalized_clean_url = clean_url.rstrip('/')
+        config_lines.append(f"clean {normalized_clean_url}")
         
         return "\n".join(config_lines)  # Fix: use actual newlines
     
