@@ -113,6 +113,12 @@ Check system status:
 linux-mirrors status
 ```
 
+Verify repository integrity:
+
+```bash
+linux-mirrors status --verify
+```
+
 Launch debug interface:
 
 ```bash
@@ -127,6 +133,49 @@ linux-mirrors storage --info
 
 # Clean up old sync data
 linux-mirrors storage --cleanup
+```
+
+## Repository Verification
+
+The `status --verify` command performs local repository structure integrity checking to ensure your mirrored repositories are complete and functional.
+
+### What it checks:
+
+**APT Repositories (Debian, Ubuntu, Kali):**
+- Directory structure (`dists/{version}` directories)
+- Release files with proper suite/codename information
+- Packages files for each component and architecture
+- Package pool directories containing `.deb` files
+- Architecture availability based on distribution version
+
+**YUM Repositories (Rocky Linux, RHEL):**
+- Repository structure for each architecture
+- `repodata` directories and `repomd.xml` metadata files
+- RPM packages in expected locations
+- Valid XML structure in metadata files
+
+### What it does NOT check:
+
+- **No cryptographic verification**: Does not verify GPG signatures or checksums against upstream
+- **No content validation**: Does not compare file hashes with upstream repositories
+- **No network verification**: Does not fetch remote metadata for comparison
+- **No package integrity**: Does not verify individual package checksums
+
+The verification is a **local filesystem sanity check** to ensure sync operations created usable repository structures, not cryptographic authenticity verification (which is handled by package managers when using the repositories).
+
+Example output:
+```bash
+$ linux-mirrors status --verify
+=== Repository Verification ===
+Repository verification: 12 total, 10 verified, 1 missing, 1 failed
+
+Verified repositories:
+  ✓ debian bookworm: File integrity verified against origin repository
+  ✓ ubuntu jammy: File integrity verified against origin repository
+
+Issues found:
+  ? debian bullseye: Repository directory not found
+  ✗ rocky 8: Missing repomd.xml for x86_64
 ```
 
 ## Configuration
