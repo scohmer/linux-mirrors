@@ -123,7 +123,7 @@ class AptSyncEngine(SyncEngine):
         if self.dist_config.name == "debian":
             archived_versions = ["wheezy", "jessie", "stretch", "buster"]
             if version in archived_versions:
-                return ["http://archive.debian.org/debian/"]
+                return ["http://archive.debian.org/debian"]
             else:
                 # Use current Debian mirrors for bullseye, bookworm, trixie, etc.
                 return self.dist_config.mirror_urls
@@ -185,11 +185,11 @@ class AptSyncEngine(SyncEngine):
                 # Security repository
                 if version in archived_versions:
                     # Archived versions with security (currently bullseye LTS)
-                    security_url = "http://archive.debian.org/debian-security/"
+                    security_url = "http://archive.debian.org/debian-security"
                     security_suite = f"{version}-security"
                 else:
                     # Current versions use security.debian.org
-                    security_url = "http://security.debian.org/debian-security/"
+                    security_url = "http://security.debian.org/debian-security"
                     security_suite = f"{version}-security"
                 
                 # Add security repository lines
@@ -206,10 +206,10 @@ class AptSyncEngine(SyncEngine):
             if version not in ["wheezy"]:  # wheezy didn't have official backports
                 if version in archived_versions:
                     # Archived backports use archive.debian.org
-                    backports_url = "http://archive.debian.org/debian/"
+                    backports_url = "http://archive.debian.org/debian"
                 else:
                     # Current backports use deb.debian.org
-                    backports_url = "http://deb.debian.org/debian/"
+                    backports_url = "http://deb.debian.org/debian"
                 
                 backports_suite = f"{version}-backports"
                 
@@ -225,7 +225,7 @@ class AptSyncEngine(SyncEngine):
         
         config_lines.append("")
         # Use appropriate clean URL based on version
-        clean_url = mirror_urls[0] if mirror_urls else "http://deb.debian.org/debian/"
+        clean_url = mirror_urls[0] if mirror_urls else "http://deb.debian.org/debian"
         normalized_clean_url = clean_url.rstrip('/')
         config_lines.append(f"clean {normalized_clean_url}")
         

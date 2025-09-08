@@ -98,27 +98,27 @@ class RepositoryVerifier:
         if dist_name == 'debian':
             # Debian architecture availability by version
             if version == 'wheezy':  # Debian 7 (2013)
-                # wheezy had limited architecture support
+                # wheezy had limited architecture support, 'all' arch may not be reliable
                 available_archs = ['amd64', 'i386', 'armhf']
             elif version == 'jessie':  # Debian 8 (2015) 
-                # jessie introduced arm64 but still limited
-                available_archs = ['amd64', 'i386', 'armhf', 'arm64']
+                # jessie introduced arm64 but still limited, 'all' arch should be available
+                available_archs = ['amd64', 'i386', 'armhf', 'arm64', 'all']
             elif version in ['stretch', 'buster']:  # Debian 9-10 (2017-2019)
-                # Full architecture support
-                available_archs = ['amd64', 'i386', 'armhf', 'arm64']
+                # Full architecture support including 'all'
+                available_archs = ['amd64', 'i386', 'armhf', 'arm64', 'all']
             else:  # bullseye, bookworm, etc. (Debian 11+)
-                # All architectures available
-                available_archs = ['amd64', 'i386', 'armhf', 'arm64']
+                # All architectures available including 'all'
+                available_archs = ['amd64', 'i386', 'armhf', 'arm64', 'all']
             
             # Filter configured architectures by what's actually available
             return [arch for arch in configured_archs if arch in available_archs]
         
         elif dist_name == 'ubuntu':
-            # Ubuntu architecture availability (similar logic can be added)
-            if version in ['18.04', '20.04']:
-                available_archs = ['amd64', 'i386', 'armhf', 'arm64']  
-            else:
-                available_archs = ['amd64', 'i386', 'armhf', 'arm64']
+            # Ubuntu architecture availability including 'all' architecture
+            if version in ['bionic', 'focal']:  # 18.04, 20.04
+                available_archs = ['amd64', 'i386', 'armhf', 'arm64', 'all']  
+            else:  # jammy, mantic, noble, oracular and newer
+                available_archs = ['amd64', 'i386', 'armhf', 'arm64', 'all']
             
             return [arch for arch in configured_archs if arch in available_archs]
         

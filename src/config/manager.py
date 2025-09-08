@@ -75,17 +75,17 @@ class MirrorConfig:
             "debian": DistributionConfig(
                 name="debian",
                 type="apt",
-                versions=["wheezy", "jessie", "stretch", "buster", "bullseye", "bookworm", "trixie"],
-                mirror_urls=["http://deb.debian.org/debian/"],
+                versions=["jessie", "stretch", "buster", "bullseye", "bookworm", "trixie"],
+                mirror_urls=["http://deb.debian.org/debian"],
                 components=["main", "contrib", "non-free"],
-                architectures=["amd64", "arm64", "i386", "armhf"],
+                architectures=["amd64", "arm64", "i386", "armhf", "all"],
                 include_source_packages=True
             ),
             "ubuntu": DistributionConfig(
                 name="ubuntu",
                 type="apt",
                 versions=["bionic", "focal", "jammy", "mantic", "noble", "oracular"],
-                mirror_urls=["http://archive.ubuntu.com/ubuntu/"],
+                mirror_urls=["http://archive.ubuntu.com/ubuntu"],
                 components=["main", "restricted", "universe", "multiverse"],
                 architectures=["amd64", "arm64", "i386", "armhf"],
                 include_source_packages=True
@@ -94,7 +94,7 @@ class MirrorConfig:
                 name="kali",
                 type="apt",
                 versions=["kali-rolling"],
-                mirror_urls=["http://http.kali.org/kali/"],
+                mirror_urls=["http://http.kali.org/kali"],
                 components=["main", "contrib", "non-free"],
                 architectures=["amd64", "arm64", "i386", "armhf"],
                 include_source_packages=True
@@ -103,7 +103,7 @@ class MirrorConfig:
                 name="rocky",
                 type="yum",
                 versions=["8", "9", "10"],
-                mirror_urls=["https://dl.rockylinux.org/pub/rocky/"],
+                mirror_urls=["https://dl.rockylinux.org/pub/rocky"],
                 components=["BaseOS", "AppStream", "PowerTools", "CRB", "extras", "devel", "plus", "HighAvailability", "ResilientStorage", "RT", "NFV", "SAP", "SAPHANA"],
                 architectures=["x86_64"],
                 iso_architectures=["x86_64", "aarch64"]
@@ -112,7 +112,7 @@ class MirrorConfig:
                 name="rhel",
                 type="yum",
                 versions=["8", "9", "10"],
-                mirror_urls=["https://cdn.redhat.com/content/dist/rhel/"],
+                mirror_urls=["https://cdn.redhat.com/content/dist/rhel"],
                 components=["BaseOS", "AppStream", "PowerTools", "CRB", "extras", "devel", "plus", "HighAvailability", "ResilientStorage", "RT", "NFV", "SAP", "SAPHANA"],
                 architectures=["x86_64"],
                 iso_architectures=["x86_64", "aarch64"],
