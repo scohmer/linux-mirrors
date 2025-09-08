@@ -126,10 +126,11 @@ class AptSyncEngine(SyncEngine):
                 return ["http://archive.debian.org/debian"]
             else:
                 # Use current Debian mirrors for bullseye, bookworm, trixie, etc.
-                return self.dist_config.mirror_urls
+                # Strip trailing slashes from all configured URLs to prevent double slashes
+                return [url.rstrip('/') for url in self.dist_config.mirror_urls]
         
-        # For other distributions, use configured mirror URLs
-        return self.dist_config.mirror_urls
+        # For other distributions, strip trailing slashes from configured mirror URLs
+        return [url.rstrip('/') for url in self.dist_config.mirror_urls]
 
     def _generate_apt_mirror_config(self, version: str) -> str:
         base_path = "/mirror"
@@ -153,10 +154,14 @@ class AptSyncEngine(SyncEngine):
         # Add main repository lines
         components = " ".join(self.dist_config.components)
         for mirror_url in mirror_urls:
-            # Normalize URL by removing trailing slash for apt-mirror compatibility
-            normalized_url = mirror_url.rstrip('/')
+            # URLs already have trailing slashes removed in _get_version_specific_urls
+            normalized_url = mirror_url
             
             for arch in self.dist_config.architectures:
+                # Skip 'all' architecture for wheezy due to repository availability issues
+                if version == "wheezy" and arch == "all":
+                    logger.warning(f"Skipping 'all' architecture for {version} - not reliably available")
+                    continue
                 # For Ubuntu, ARM architectures (arm64, armhf) use ports.ubuntu.com instead of archive.ubuntu.com
                 if (self.dist_config.name == "ubuntu" and arch in ["arm64", "armhf"] and 
                     "archive.ubuntu.com" in normalized_url):
@@ -192,9 +197,13 @@ class AptSyncEngine(SyncEngine):
                     security_url = "http://security.debian.org/debian-security"
                     security_suite = f"{version}-security"
                 
-                # Add security repository lines
-                normalized_security_url = security_url.rstrip('/')
+                # Add security repository lines (URLs already clean, no trailing slashes)
+                normalized_security_url = security_url
+                
                 for arch in self.dist_config.architectures:
+                    # Skip 'all' architecture for wheezy security repos
+                    if version == "wheezy" and arch == "all":
+                        continue
                     security_line = f"deb-{arch} {normalized_security_url} {security_suite} {components}"
                     config_lines.append(security_line)
                 
@@ -213,8 +222,9 @@ class AptSyncEngine(SyncEngine):
                 
                 backports_suite = f"{version}-backports"
                 
-                # Add backports repository lines
-                normalized_backports_url = backports_url.rstrip('/')
+                # Add backports repository lines (URLs already clean, no trailing slashes)
+                normalized_backports_url = backports_url
+                
                 for arch in self.dist_config.architectures:
                     backports_line = f"deb-{arch} {normalized_backports_url} {backports_suite} {components}"
                     config_lines.append(backports_line)
@@ -224,10 +234,9 @@ class AptSyncEngine(SyncEngine):
                     config_lines.append(backports_src)
         
         config_lines.append("")
-        # Use appropriate clean URL based on version
+        # Use appropriate clean URL based on version (URLs already clean, no trailing slashes)
         clean_url = mirror_urls[0] if mirror_urls else "http://deb.debian.org/debian"
-        normalized_clean_url = clean_url.rstrip('/')
-        config_lines.append(f"clean {normalized_clean_url}")
+        config_lines.append(f"clean {clean_url}")
         
         return "\n".join(config_lines)  # Fix: use actual newlines
     
