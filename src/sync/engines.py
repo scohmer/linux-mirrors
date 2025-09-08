@@ -364,14 +364,14 @@ class YumSyncEngine(SyncEngine):
             echo "Using key: $KEY_FILE" &&
             echo -e "{escaped_config}" | sed "s|sslclientcert=/etc/pki/entitlement/|sslclientcert=$CERT_FILE|g; s|sslclientkey=/etc/pki/entitlement/|sslclientkey=$KEY_FILE|g" > {config_file} &&
             {' && '.join(mkdir_commands)} &&
-            {' && '.join(commands)} &&
+            {'; '.join(commands)} &&
             {' && '.join(createrepo_commands)}
             '''
         else:
             full_command = f'''
             echo -e "{escaped_config}" > {config_file} &&
             {' && '.join(mkdir_commands)} &&
-            {' && '.join(commands)} &&
+            {'; '.join(commands)} &&
             {' && '.join(createrepo_commands)}
             '''
         
