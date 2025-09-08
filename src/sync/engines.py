@@ -316,36 +316,40 @@ class YumSyncEngine(SyncEngine):
                 # Rocky Linux and other YUM distributions
                 for mirror_url in self.dist_config.mirror_urls:
                     for repo_id, repo_info in repositories.items():
-                        logger.info(f"Processing repository: {repo_id} for {self.dist_config.name} {version} {arch}")
-                        repo_path = f"/mirror/{version}/{repo_info['path']}/{arch}/os"
-                        repo_tmp = f"/tmp/sync/{repo_name}-{repo_id}-{arch}"
-                        
-                        # Standard sync command
-                        cmd = f"""
-                        echo "Installing rsync for safe file transfers..." &&
-                        dnf install -y rsync &&
-                        echo "Starting sync for {repo_id} {arch}..." &&
-                        dnf reposync --config={config_file} --repoid={repo_name}-{repo_id}-{arch} --arch={arch} -p /tmp/sync --download-metadata --downloadcomps --newest-only --verbose 2>&1 &&
-                    echo "Sync completed, checking results..." &&
-                    ls -la /tmp/sync/ &&
-                    if [ -d {repo_tmp} ]; then
-                        echo "Found sync directory {repo_tmp}" &&
-                        ls -la {repo_tmp}/ &&
-                        if [ -n "$(ls -A {repo_tmp} 2>/dev/null)" ]; then
-                            echo "Syncing files to {repo_path} with rsync..." &&
-                            rsync -av --delete-after {repo_tmp}/ {repo_path}/ &&
-                            rm -rf {repo_tmp} &&
-                            echo "Successfully synced {repo_id} {arch}"
+                        try:
+                            logger.info(f"Processing repository: {repo_id} for {self.dist_config.name} {version} {arch}")
+                            repo_path = f"/mirror/{version}/{repo_info['path']}/{arch}/os"
+                            repo_tmp = f"/tmp/sync/{repo_name}-{repo_id}-{arch}"
+                            
+                            # Standard sync command
+                            cmd = f"""
+                            echo "Installing rsync for safe file transfers..." &&
+                            dnf install -y rsync &&
+                            echo "Starting sync for {repo_id} {arch}..." &&
+                            dnf reposync --config={config_file} --repoid={repo_name}-{repo_id}-{arch} --arch={arch} -p /tmp/sync --download-metadata --downloadcomps --newest-only --verbose 2>&1 &&
+                        echo "Sync completed, checking results..." &&
+                        ls -la /tmp/sync/ &&
+                        if [ -d {repo_tmp} ]; then
+                            echo "Found sync directory {repo_tmp}" &&
+                            ls -la {repo_tmp}/ &&
+                            if [ -n "$(ls -A {repo_tmp} 2>/dev/null)" ]; then
+                                echo "Syncing files to {repo_path} with rsync..." &&
+                                rsync -av --delete-after {repo_tmp}/ {repo_path}/ &&
+                                rm -rf {repo_tmp} &&
+                                echo "Successfully synced {repo_id} {arch}"
+                            else
+                                echo "No files in {repo_tmp}, cleaning up..." &&
+                                rm -rf {repo_tmp}
+                            fi
                         else
-                            echo "No files in {repo_tmp}, cleaning up..." &&
-                            rm -rf {repo_tmp}
+                            echo "Sync directory {repo_tmp} not found, may have failed"
                         fi
-                    else
-                        echo "Sync directory {repo_tmp} not found, may have failed"
-                    fi
-                    """.strip()
-                    commands.append(cmd)
-                    logger.info(f"Added sync command for {repo_id} (command #{len(commands)})")
+                        """.strip()
+                            commands.append(cmd)
+                            logger.info(f"Added sync command for {repo_id} (command #{len(commands)})")
+                        except Exception as e:
+                            logger.error(f"Failed to generate command for {repo_id}: {e}")
+                            continue
                     
                     # Create repository metadata (only if directory has content)
                     createrepo_commands.append(f"[ -n \"$(ls -A {repo_path} 2>/dev/null)\" ] && createrepo_c {repo_path} || echo \"Skipping createrepo for empty {repo_path}\"")
