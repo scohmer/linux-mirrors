@@ -292,6 +292,7 @@ class YumSyncEngine(SyncEngine):
                         ls -la {repo_tmp}/ &&
                         if [ -n "$(ls -A {repo_tmp} 2>/dev/null)" ]; then
                             echo "Moving files to {repo_path}..." &&
+                            rm -rf {repo_path}/* &&
                             mv {repo_tmp}/* {repo_path}/ &&
                             rm -rf {repo_tmp} &&
                             echo "Successfully synced {repo_id} {arch}"
@@ -325,6 +326,7 @@ class YumSyncEngine(SyncEngine):
                         ls -la {repo_tmp}/ &&
                         if [ -n "$(ls -A {repo_tmp} 2>/dev/null)" ]; then
                             echo "Moving files to {repo_path}..." &&
+                            rm -rf {repo_path}/* &&
                             mv {repo_tmp}/* {repo_path}/ &&
                             rm -rf {repo_tmp} &&
                             echo "Successfully synced {repo_id} {arch}"
