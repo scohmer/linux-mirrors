@@ -191,12 +191,16 @@ VOLUME ["/mirror"]
                 create_cmd.extend(['--env', f'no_proxy={proxy_config["no_proxy"]}'])
                 create_cmd.extend(['--env', f'NO_PROXY={proxy_config["no_proxy"]}'])
             
-            # Add RHEL-specific credential mounts and root user
+            # Add distribution-specific configurations
             if dist_config.name == "rhel":
                 create_cmd.extend([
                     '--user', 'root',  # RHEL sync requires root for dnf operations
                     '--volume', '/etc/pki/entitlement:/etc/pki/entitlement:ro',
                     '--volume', '/etc/rhsm/rhsm.conf:/etc/rhsm/rhsm.conf:ro',
+                ])
+            elif dist_config.name == "rocky":
+                create_cmd.extend([
+                    '--user', 'root',  # Rocky sync requires root for package installation
                 ])
             
             create_cmd.extend([image_tag] + command)
