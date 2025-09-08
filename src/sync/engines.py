@@ -395,45 +395,53 @@ class YumSyncEngine(SyncEngine):
         return all_archs
 
     def _get_available_repositories(self, version: str) -> Dict[str, Dict[str, str]]:
-        """Get all available repositories for a specific version"""
-        if self.dist_config.name in ["rocky", "rhel"]:
-            if version == "8":
-                return {
-                    "baseos": {"name": "BaseOS", "path": "BaseOS"},
-                    "appstream": {"name": "AppStream", "path": "AppStream"},
-                    "powertools": {"name": "PowerTools", "path": "PowerTools"},
-                    "extras": {"name": "Extras", "path": "extras"},
-                    "devel": {"name": "Devel", "path": "Devel"},
-                    "plus": {"name": "Plus", "path": "plus"},
-                    "ha": {"name": "HighAvailability", "path": "HighAvailability"},
-                    "rs": {"name": "ResilientStorage", "path": "ResilientStorage"},
-                    "rt": {"name": "RT", "path": "RT"},
-                    "nfv": {"name": "NFV", "path": "NFV"}
-                }
-            elif version in ["9", "10"]:
-                repos = {
-                    "baseos": {"name": "BaseOS", "path": "BaseOS"},
-                    "appstream": {"name": "AppStream", "path": "AppStream"},
-                    "crb": {"name": "CRB", "path": "CRB"},
-                    "extras": {"name": "Extras", "path": "extras"},
-                    "devel": {"name": "Devel", "path": "devel"},
-                    "plus": {"name": "Plus", "path": "plus"},
-                    "ha": {"name": "HighAvailability", "path": "HighAvailability"},
-                    "rt": {"name": "RT", "path": "RT"},
-                    "nfv": {"name": "NFV", "path": "NFV"},
-                    "sap": {"name": "SAP", "path": "SAP"},
-                    "saphana": {"name": "SAPHANA", "path": "SAPHANA"}
-                }
-                # ResilientStorage only available in Rocky 9
-                if version == "9":
-                    repos["rs"] = {"name": "ResilientStorage", "path": "ResilientStorage"}
-                return repos
+        """Get all available repositories based on configuration components"""
+        repositories = {}
         
-        # Default fallback for other distributions
-        return {
-            "baseos": {"name": "BaseOS", "path": "BaseOS"},
-            "appstream": {"name": "AppStream", "path": "AppStream"}
-        }
+        # Use components from configuration if available
+        if hasattr(self.dist_config, 'components') and self.dist_config.components:
+            for component in self.dist_config.components:
+                # Map component names to repository IDs and paths
+                repo_id = component.lower().replace("tools", "").replace("availability", "")
+                
+                # Handle special cases for repository naming
+                if component == "PowerTools":
+                    # PowerTools for version 8, CRB for versions 9+
+                    if version == "8":
+                        repositories["powertools"] = {"name": component, "path": component}
+                    # Skip PowerTools for versions 9+ as it's replaced by CRB
+                elif component == "CRB":
+                    # CRB only available in versions 9+
+                    if version in ["9", "10"]:
+                        repositories["crb"] = {"name": component, "path": component}
+                    # Skip CRB for version 8 as it uses PowerTools
+                elif component == "ResilientStorage":
+                    # ResilientStorage only available in Rocky/RHEL 9
+                    if version == "9":
+                        repositories["rs"] = {"name": component, "path": component}
+                    # Skip for other versions
+                elif component == "SAPHANA":
+                    # SAP HANA only available in versions 9+
+                    if version in ["9", "10"]:
+                        repositories["saphana"] = {"name": component, "path": component}
+                elif component == "SAP":
+                    # SAP only available in versions 9+
+                    if version in ["9", "10"]:
+                        repositories["sap"] = {"name": component, "path": component}
+                else:
+                    # Standard components available in all versions
+                    repo_key = component.lower()
+                    if component == "HighAvailability":
+                        repo_key = "ha"
+                    repositories[repo_key] = {"name": component, "path": component}
+        else:
+            # Fallback to minimal default repositories if no components configured
+            repositories = {
+                "baseos": {"name": "BaseOS", "path": "BaseOS"},
+                "appstream": {"name": "AppStream", "path": "AppStream"}
+            }
+        
+        return repositories
 
     def _generate_iso_download_commands(self, version: str, supported_archs: List[str]) -> List[str]:
         """Generate commands to download ISO images for YUM distributions"""
