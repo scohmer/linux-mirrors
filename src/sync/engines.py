@@ -123,6 +123,7 @@ class AptSyncEngine(SyncEngine):
         if self.dist_config.name == "debian":
             archived_versions = ["wheezy", "jessie", "stretch", "buster"]
             if version in archived_versions:
+                # Try without the trailing /debian to see if that fixes double slash
                 return ["http://archive.debian.org/debian"]
             else:
                 # Use current Debian mirrors for bullseye, bookworm, trixie, etc.
@@ -157,19 +158,22 @@ class AptSyncEngine(SyncEngine):
             # URLs already have trailing slashes removed in _get_version_specific_urls
             normalized_url = mirror_url
             
-            for arch in self.dist_config.architectures:
-                # Skip 'all' architecture for wheezy due to repository availability issues
-                if version == "wheezy" and arch == "all":
-                    logger.warning(f"Skipping 'all' architecture for {version} - not reliably available")
-                    continue
-                # For Ubuntu, ARM architectures (arm64, armhf) use ports.ubuntu.com instead of archive.ubuntu.com
-                if (self.dist_config.name == "ubuntu" and arch in ["arm64", "armhf"] and 
-                    "archive.ubuntu.com" in normalized_url):
-                    arch_specific_url = normalized_url.replace("archive.ubuntu.com/ubuntu", "ports.ubuntu.com/ubuntu-ports")
-                else:
-                    arch_specific_url = normalized_url
-                    
-                repo_line = f"deb-{arch} {arch_specific_url} {version} {components}"
+            # For Ubuntu, ARM architectures (arm64, armhf) use ports.ubuntu.com instead of archive.ubuntu.com  
+            if (self.dist_config.name == "ubuntu" and 
+                any(arch in ["arm64", "armhf"] for arch in self.dist_config.architectures) and
+                "archive.ubuntu.com" in normalized_url):
+                # Add both main and ports repositories for Ubuntu
+                main_repo_line = f"deb {normalized_url} {version} {components}"
+                logger.debug(f"Generated repo line: {main_repo_line}")
+                config_lines.append(main_repo_line)
+                
+                ports_url = normalized_url.replace("archive.ubuntu.com/ubuntu", "ports.ubuntu.com/ubuntu-ports")
+                ports_repo_line = f"deb {ports_url} {version} {components}"
+                logger.debug(f"Generated ports repo line: {ports_repo_line}")
+                config_lines.append(ports_repo_line)
+            else:
+                repo_line = f"deb {normalized_url} {version} {components}"
+                logger.debug(f"Generated repo line: {repo_line}")
                 config_lines.append(repo_line)
             
             # Add source packages if enabled (use main mirror for sources)
@@ -200,12 +204,8 @@ class AptSyncEngine(SyncEngine):
                 # Add security repository lines (URLs already clean, no trailing slashes)
                 normalized_security_url = security_url
                 
-                for arch in self.dist_config.architectures:
-                    # Skip 'all' architecture for wheezy security repos
-                    if version == "wheezy" and arch == "all":
-                        continue
-                    security_line = f"deb-{arch} {normalized_security_url} {security_suite} {components}"
-                    config_lines.append(security_line)
+                security_line = f"deb {normalized_security_url} {security_suite} {components}"
+                config_lines.append(security_line)
                 
                 if getattr(self.dist_config, 'include_source_packages', False):
                     security_src = f"deb-src {normalized_security_url} {security_suite} {components}"
@@ -225,9 +225,8 @@ class AptSyncEngine(SyncEngine):
                 # Add backports repository lines (URLs already clean, no trailing slashes)
                 normalized_backports_url = backports_url
                 
-                for arch in self.dist_config.architectures:
-                    backports_line = f"deb-{arch} {normalized_backports_url} {backports_suite} {components}"
-                    config_lines.append(backports_line)
+                backports_line = f"deb {normalized_backports_url} {backports_suite} {components}"
+                config_lines.append(backports_line)
                 
                 if getattr(self.dist_config, 'include_source_packages', False):
                     backports_src = f"deb-src {normalized_backports_url} {backports_suite} {components}"
@@ -238,7 +237,9 @@ class AptSyncEngine(SyncEngine):
         clean_url = mirror_urls[0] if mirror_urls else "http://deb.debian.org/debian"
         config_lines.append(f"clean {clean_url}")
         
-        return "\n".join(config_lines)  # Fix: use actual newlines
+        result_config = "\n".join(config_lines)
+        logger.debug(f"Generated apt-mirror config for {self.dist_config.name} {version}:\n{result_config}")
+        return result_config
     
     def validate_config(self) -> bool:
         required_fields = ['mirror_urls', 'components', 'architectures']
