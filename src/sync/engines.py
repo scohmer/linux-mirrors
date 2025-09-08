@@ -257,6 +257,10 @@ class YumSyncEngine(SyncEngine):
         supported_archs = self._get_supported_architectures(version)
         repositories = self._get_available_repositories(version)
         
+        # Debug: Log detected repositories
+        repo_names = list(repositories.keys())
+        logger.info(f"Detected repositories for {self.dist_config.name} {version}: {repo_names}")
+        
         # Create reposync command for each repository and architecture
         commands = []
         createrepo_commands = []
@@ -311,6 +315,7 @@ class YumSyncEngine(SyncEngine):
                 # Rocky Linux and other YUM distributions
                 for mirror_url in self.dist_config.mirror_urls:
                     for repo_id, repo_info in repositories.items():
+                        logger.info(f"Processing repository: {repo_id} for {self.dist_config.name} {version} {arch}")
                         repo_path = f"/mirror/{version}/{repo_info['path']}/{arch}/os"
                         repo_tmp = f"/tmp/sync/{repo_name}-{repo_id}-{arch}"
                         
@@ -346,6 +351,9 @@ class YumSyncEngine(SyncEngine):
         # Add ISO download commands
         iso_commands = self._generate_iso_download_commands(version)
         commands.extend(iso_commands)
+        
+        # Debug: Log total commands generated
+        logger.info(f"Generated {len(commands)} sync commands for {self.dist_config.name} {version}")
         
         # Escape the repo config for shell
         escaped_config = repo_config.replace('"', '\\"').replace('\n', '\\n')
