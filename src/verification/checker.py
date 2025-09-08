@@ -186,6 +186,10 @@ class RepositoryVerifier:
         
         for component in dist_config.components or ['main']:
             for arch in available_architectures:
+                # Skip 'all' architecture - these packages are included in main architecture Packages files
+                if arch == 'all':
+                    continue
+                    
                 # Check Packages file
                 packages_path = os.path.join(dists_path, component, f'binary-{arch}', 'Packages.gz')
                 files_checked += 1
