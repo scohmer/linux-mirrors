@@ -444,7 +444,7 @@ class YumSyncEngine(SyncEngine):
         return repositories
 
     def _generate_iso_download_commands(self, version: str) -> List[str]:
-        """Generate commands to download ISO images for YUM distributions"""
+        """Generate commands to download ISO images for YUM distributions with SHA256 verification"""
         if self.dist_config.name not in ["rocky", "rhel"]:
             return []
         
@@ -460,27 +460,60 @@ class YumSyncEngine(SyncEngine):
         
         for mirror_url in self.dist_config.mirror_urls:
             for arch in iso_archs:
-                # Download boot ISOs and DVD ISOs
                 iso_base_url = f"{mirror_url}{version}/isos/{arch}/"
                 
-                # Common ISO patterns for Rocky Linux and RHEL
-                if self.dist_config.name == "rocky":
-                    iso_patterns = [
-                        f"Rocky-{version}*.iso",  # All ISOs for the version
-                    ]
-                elif self.dist_config.name == "rhel":
-                    iso_patterns = [
-                        f"rhel-{version}*.iso",  # All ISOs for the version
-                    ]
-                else:
-                    iso_patterns = [f"*.iso"]  # Generic fallback
-                
-                for pattern in iso_patterns:
-                    # Use wget to download ISO files with pattern matching
-                    iso_cmd = f"wget -r -l1 -nd -A '{pattern}' -P /mirror/isos/ {iso_base_url} || echo 'No ISOs found for {arch} or download failed'"
-                    iso_commands.append(iso_cmd)
+                # Download and verify checksums before downloading ISOs
+                checksum_verification_commands = self._generate_iso_checksum_verification(iso_base_url, version, arch)
+                iso_commands.extend(checksum_verification_commands)
         
         return iso_commands
+    
+    def _generate_iso_checksum_verification(self, iso_base_url: str, version: str, arch: str) -> List[str]:
+        """Generate commands to verify ISO checksums and only download if needed"""
+        commands = []
+        
+        if self.dist_config.name == "rocky":
+            # Rocky Linux uses a single CHECKSUM file
+            checksum_url = f"{iso_base_url}CHECKSUM"
+            commands.extend([
+                f"echo 'Downloading checksum file for Rocky {version} {arch}...'",
+                f"wget -q -O /tmp/CHECKSUM_{version}_{arch} {checksum_url} || echo 'Warning: Could not download CHECKSUM file'",
+                f"if [ -f /tmp/CHECKSUM_{version}_{arch} ]; then",
+                f"  echo 'Processing checksums for Rocky {version} {arch}...'",
+                # Parse CHECKSUM file and verify each ISO
+                f"  while IFS=' ' read -r checksum filename; do",
+                f"    if [[ \"$filename\" == *\".iso\" ]]; then",
+                f"      local_file=\"/mirror/isos/$filename\"",
+                f"      if [ -f \"$local_file\" ]; then",
+                f"        echo \"Verifying existing ISO: $filename\"",
+                f"        local_checksum=$(sha256sum \"$local_file\" | cut -d' ' -f1)",
+                f"        if [ \"$local_checksum\" = \"$checksum\" ]; then",
+                f"          echo \"✓ $filename: Checksum matches, skipping download\"",
+                f"        else",
+                f"          echo \"✗ $filename: Checksum mismatch, re-downloading\"",
+                f"          wget -O \"$local_file\" \"{iso_base_url}$filename\" || echo \"Failed to download $filename\"",
+                f"        fi",
+                f"      else",
+                f"        echo \"Downloading new ISO: $filename\"",
+                f"        wget -O \"$local_file\" \"{iso_base_url}$filename\" || echo \"Failed to download $filename\"",
+                f"      fi",
+                f"    fi",
+                f"  done < /tmp/CHECKSUM_{version}_{arch}",
+                f"  rm -f /tmp/CHECKSUM_{version}_{arch}",
+                f"else",
+                f"  echo 'Falling back to pattern-based download without verification'",
+                f"  wget -r -l1 -nd -A 'Rocky-{version}*.iso' -P /mirror/isos/ {iso_base_url} || echo 'No ISOs found for {arch} or download failed'",
+                f"fi"
+            ])
+        
+        elif self.dist_config.name == "rhel":
+            # RHEL may not have public CHECKSUM files, use timestamp-based checking
+            commands.extend([
+                f"echo 'RHEL ISO verification - using timestamp-based checking'",
+                f"wget -r -l1 -nd -N -A 'rhel-{version}*.iso' -P /mirror/isos/ {iso_base_url} || echo 'No ISOs found for {arch} or download failed'"
+            ])
+        
+        return commands
     
     def _generate_yum_repo_config(self, version: str) -> str:
         repo_name = f"{self.dist_config.name}-{version}"
