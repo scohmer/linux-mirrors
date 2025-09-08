@@ -155,11 +155,19 @@ class AptSyncEngine(SyncEngine):
         for mirror_url in mirror_urls:
             # Normalize URL by removing trailing slash for apt-mirror compatibility
             normalized_url = mirror_url.rstrip('/')
+            
             for arch in self.dist_config.architectures:
-                repo_line = f"deb-{arch} {normalized_url} {version} {components}"
+                # For Ubuntu, ARM architectures (arm64, armhf) use ports.ubuntu.com instead of archive.ubuntu.com
+                if (self.dist_config.name == "ubuntu" and arch in ["arm64", "armhf"] and 
+                    "archive.ubuntu.com" in normalized_url):
+                    arch_specific_url = normalized_url.replace("archive.ubuntu.com/ubuntu", "ports.ubuntu.com/ubuntu-ports")
+                else:
+                    arch_specific_url = normalized_url
+                    
+                repo_line = f"deb-{arch} {arch_specific_url} {version} {components}"
                 config_lines.append(repo_line)
             
-            # Add source packages if enabled
+            # Add source packages if enabled (use main mirror for sources)
             if getattr(self.dist_config, 'include_source_packages', False):
                 src_line = f"deb-src {normalized_url} {version} {components}"
                 config_lines.append(src_line)
