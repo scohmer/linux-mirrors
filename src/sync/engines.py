@@ -403,9 +403,6 @@ class YumSyncEngine(SyncEngine):
         # Use components from configuration if available
         if hasattr(self.dist_config, 'components') and self.dist_config.components:
             for component in self.dist_config.components:
-                # Map component names to repository IDs and paths
-                repo_id = component.lower().replace("tools", "").replace("availability", "")
-                
                 # Handle special cases for repository naming
                 if component == "PowerTools":
                     # PowerTools for version 8, CRB for versions 9+
@@ -430,11 +427,11 @@ class YumSyncEngine(SyncEngine):
                     # SAP only available in versions 9+
                     if version in ["9", "10"]:
                         repositories["sap"] = {"name": component, "path": component}
+                elif component == "HighAvailability":
+                    repositories["ha"] = {"name": component, "path": component}
                 else:
-                    # Standard components available in all versions
+                    # Standard components - use lowercase for repo key
                     repo_key = component.lower()
-                    if component == "HighAvailability":
-                        repo_key = "ha"
                     repositories[repo_key] = {"name": component, "path": component}
         else:
             # Fallback to minimal default repositories if no components configured
