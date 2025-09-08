@@ -308,6 +308,7 @@ class YumSyncEngine(SyncEngine):
                     fi
                     """.strip()
                     commands.append(cmd)
+                    logger.info(f"Added sync command for {repo_id} (command #{len(commands)})")
                     
                     # Create repository metadata (only if directory has content)
                     createrepo_commands.append(f"[ -n \"$(ls -A {repo_path} 2>/dev/null)\" ] && createrepo_c {repo_path} || echo \"Skipping createrepo for empty {repo_path}\"")
@@ -344,6 +345,7 @@ class YumSyncEngine(SyncEngine):
                     fi
                     """.strip()
                     commands.append(cmd)
+                    logger.info(f"Added sync command for {repo_id} (command #{len(commands)})")
                     
                     # Create repository metadata (only if directory has content)
                     createrepo_commands.append(f"[ -n \"$(ls -A {repo_path} 2>/dev/null)\" ] && createrepo_c {repo_path} || echo \"Skipping createrepo for empty {repo_path}\"")
