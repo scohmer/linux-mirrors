@@ -117,7 +117,7 @@ class RepositoryVerifier:
             # Ubuntu architecture availability including 'all' architecture
             if version in ['bionic', 'focal']:  # 18.04, 20.04
                 available_archs = ['amd64', 'i386', 'armhf', 'arm64', 'all']  
-            else:  # jammy, mantic, noble, oracular and newer
+            else:  # jammy, noble, oracular and newer
                 available_archs = ['amd64', 'i386', 'armhf', 'arm64', 'all']
             
             return [arch for arch in configured_archs if arch in available_archs]

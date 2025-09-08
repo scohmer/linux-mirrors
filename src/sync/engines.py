@@ -123,11 +123,20 @@ class AptSyncEngine(SyncEngine):
         if self.dist_config.name == "debian":
             archived_versions = ["wheezy", "jessie", "stretch", "buster"]
             if version in archived_versions:
-                # Try without the trailing /debian to see if that fixes double slash
                 return ["http://archive.debian.org/debian"]
             else:
                 # Use current Debian mirrors for bullseye, bookworm, trixie, etc.
                 # Strip trailing slashes from all configured URLs to prevent double slashes
+                return [url.rstrip('/') for url in self.dist_config.mirror_urls]
+        
+        # Special handling for Ubuntu EOL versions
+        elif self.dist_config.name == "ubuntu":
+            # Ubuntu versions that have reached EOL and moved to old-releases
+            eol_versions = ["mantic"]  # Ubuntu 23.10 - EOL July 11, 2024
+            if version in eol_versions:
+                return ["http://old-releases.ubuntu.com/ubuntu"]
+            else:
+                # Use current Ubuntu mirrors for supported versions
                 return [url.rstrip('/') for url in self.dist_config.mirror_urls]
         
         # For other distributions, strip trailing slashes from configured mirror URLs

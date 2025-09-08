@@ -84,7 +84,7 @@ class MirrorConfig:
             "ubuntu": DistributionConfig(
                 name="ubuntu",
                 type="apt",
-                versions=["bionic", "focal", "jammy", "mantic", "noble", "oracular"],
+                versions=["bionic", "focal", "jammy", "noble", "oracular"],
                 mirror_urls=["http://archive.ubuntu.com/ubuntu"],
                 components=["main", "restricted", "universe", "multiverse"],
                 architectures=["amd64", "arm64", "i386", "armhf"],
