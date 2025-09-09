@@ -167,21 +167,21 @@ class AptSyncEngine(SyncEngine):
             # URLs already have trailing slashes removed in _get_version_specific_urls
             normalized_url = mirror_url
             
-            # For Ubuntu, ARM architectures (arm64, armhf) use ports.ubuntu.com instead of archive.ubuntu.com  
-            if (self.dist_config.name == "ubuntu" and 
-                any(arch in ["arm64", "armhf"] for arch in self.dist_config.architectures) and
-                "archive.ubuntu.com" in normalized_url):
-                # Add both main and ports repositories for Ubuntu
-                main_repo_line = f"deb {normalized_url} {version} {components}"
-                logger.debug(f"Generated repo line: {main_repo_line}")
-                config_lines.append(main_repo_line)
+            # Generate architecture-specific deb lines for apt-mirror
+            for arch in self.dist_config.architectures:
+                # Skip 'all' architecture for wheezy due to repository availability issues
+                if version == "wheezy" and arch == "all":
+                    logger.warning(f"Skipping 'all' architecture for {version} - not reliably available")
+                    continue
                 
-                ports_url = normalized_url.replace("archive.ubuntu.com/ubuntu", "ports.ubuntu.com/ubuntu-ports")
-                ports_repo_line = f"deb {ports_url} {version} {components}"
-                logger.debug(f"Generated ports repo line: {ports_repo_line}")
-                config_lines.append(ports_repo_line)
-            else:
-                repo_line = f"deb {normalized_url} {version} {components}"
+                # For Ubuntu, ARM architectures (arm64, armhf) use ports.ubuntu.com instead of archive.ubuntu.com
+                if (self.dist_config.name == "ubuntu" and arch in ["arm64", "armhf"] and 
+                    "archive.ubuntu.com" in normalized_url):
+                    arch_specific_url = normalized_url.replace("archive.ubuntu.com/ubuntu", "ports.ubuntu.com/ubuntu-ports")
+                else:
+                    arch_specific_url = normalized_url
+                    
+                repo_line = f"deb-{arch} {arch_specific_url} {version} {components}"
                 logger.debug(f"Generated repo line: {repo_line}")
                 config_lines.append(repo_line)
             
@@ -213,8 +213,12 @@ class AptSyncEngine(SyncEngine):
                 # Add security repository lines (URLs already clean, no trailing slashes)
                 normalized_security_url = security_url
                 
-                security_line = f"deb {normalized_security_url} {security_suite} {components}"
-                config_lines.append(security_line)
+                for arch in self.dist_config.architectures:
+                    # Skip 'all' architecture for wheezy security repos
+                    if version == "wheezy" and arch == "all":
+                        continue
+                    security_line = f"deb-{arch} {normalized_security_url} {security_suite} {components}"
+                    config_lines.append(security_line)
                 
                 if getattr(self.dist_config, 'include_source_packages', False):
                     security_src = f"deb-src {normalized_security_url} {security_suite} {components}"
@@ -234,8 +238,9 @@ class AptSyncEngine(SyncEngine):
                 # Add backports repository lines (URLs already clean, no trailing slashes)
                 normalized_backports_url = backports_url
                 
-                backports_line = f"deb {normalized_backports_url} {backports_suite} {components}"
-                config_lines.append(backports_line)
+                for arch in self.dist_config.architectures:
+                    backports_line = f"deb-{arch} {normalized_backports_url} {backports_suite} {components}"
+                    config_lines.append(backports_line)
                 
                 if getattr(self.dist_config, 'include_source_packages', False):
                     backports_src = f"deb-src {normalized_backports_url} {backports_suite} {components}"
