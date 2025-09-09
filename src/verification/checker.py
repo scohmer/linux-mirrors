@@ -101,8 +101,8 @@ class RepositoryVerifier:
                 # wheezy had limited architecture support, 'all' arch may not be reliable
                 available_archs = ['amd64', 'i386', 'armhf']
             elif version == 'jessie':  # Debian 8 (2015) 
-                # jessie introduced arm64 but still limited, 'all' arch should be available
-                available_archs = ['amd64', 'i386', 'armhf', 'arm64', 'all']
+                # jessie introduced arm64 but 'all' arch binary-all directories don't exist
+                available_archs = ['amd64', 'i386', 'armhf', 'arm64']
             elif version in ['stretch', 'buster']:  # Debian 9-10 (2017-2019)
                 # Full architecture support including 'all'
                 available_archs = ['amd64', 'i386', 'armhf', 'arm64', 'all']
@@ -186,10 +186,6 @@ class RepositoryVerifier:
         
         for component in dist_config.components or ['main']:
             for arch in available_architectures:
-                # Skip 'all' architecture - these packages are included in main architecture Packages files
-                if arch == 'all':
-                    continue
-                    
                 # Check Packages file
                 packages_path = os.path.join(dists_path, component, f'binary-{arch}', 'Packages.gz')
                 files_checked += 1
