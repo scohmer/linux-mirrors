@@ -366,6 +366,35 @@ class RepositoryVerifier:
                     
                     logger.debug(f"Current Debian version {version} - prioritizing deb.debian.org paths")
             
+            # For Ubuntu, handle EOL versions that use old-releases.ubuntu.com
+            elif dist_name == 'ubuntu':
+                # Ubuntu versions that have reached EOL and moved to old-releases
+                eol_versions = ["mantic"]  # Ubuntu 23.10 - EOL July 11, 2024
+                
+                if version in eol_versions:
+                    # For EOL versions, check old-releases.ubuntu.com paths first
+                    old_releases_mirror_path = os.path.join(base_path, 'mirror', 'old-releases.ubuntu.com', 'ubuntu')
+                    old_releases_direct_path = os.path.join(base_path, 'old-releases.ubuntu.com', 'ubuntu')
+                    
+                    # Insert at beginning to prioritize old-releases paths for EOL versions
+                    mirror_paths.insert(0, old_releases_mirror_path)
+                    mirror_paths.insert(1, old_releases_direct_path)
+                    
+                    logger.debug(f"EOL Ubuntu version {version} - prioritizing old-releases.ubuntu.com paths")
+                
+                else:
+                    # For current versions, check archive.ubuntu.com paths first
+                    archive_mirror_path = os.path.join(base_path, 'mirror', 'archive.ubuntu.com', 'ubuntu')
+                    archive_direct_path = os.path.join(base_path, 'archive.ubuntu.com', 'ubuntu')
+                    
+                    # Only add if not already in the list from mirror_urls processing
+                    if archive_mirror_path not in mirror_paths:
+                        mirror_paths.insert(0, archive_mirror_path)
+                    if archive_direct_path not in mirror_paths:
+                        mirror_paths.insert(1, archive_direct_path)
+                    
+                    logger.debug(f"Current Ubuntu version {version} - prioritizing archive.ubuntu.com paths")
+            
             # Also check the base path itself (in case it's structured differently)
             mirror_paths.append(base_path)
             
