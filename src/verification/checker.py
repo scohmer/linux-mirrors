@@ -942,6 +942,40 @@ class RepositoryVerifier:
         
         return any(pattern in filename for pattern in optional_patterns)
 
+    def _should_verify_file(self, filename: str, dist_config: DistributionConfig) -> bool:
+        """Check if a file should be verified based on configuration (architectures, components, etc.)"""
+        
+        # Get configured architectures and components
+        configured_archs = dist_config.architectures or ['amd64']
+        configured_components = dist_config.components or ['main']
+        
+        # Always verify Release files and other metadata
+        metadata_files = ['Release', 'InRelease', 'Release.gpg']
+        if filename in metadata_files:
+            return True
+        
+        # Check component filtering
+        component_match = False
+        for component in configured_components:
+            if filename.startswith(f'{component}/') or filename.startswith(component):
+                component_match = True
+                break
+        
+        # If it's a component-specific file and we don't have that component configured, skip it
+        known_components = ['main', 'contrib', 'non-free', 'restricted', 'universe', 'multiverse', 'non-free-firmware']
+        if any(filename.startswith(f'{comp}/') for comp in known_components):
+            if not component_match:
+                return False
+        
+        # Check architecture filtering
+        arch_match = True  # Default to True for non-architecture specific files
+        for arch in ['amd64', 'i386', 'arm64', 'armhf', 'armel', 'ppc64el', 'riscv64', 's390x', 'mips', 'mipsel', 'mips64el', 'ia64', 'kfreebsd-amd64', 'kfreebsd-i386', 'all']:
+            if f'binary-{arch}' in filename or f'Contents-{arch}' in filename:
+                arch_match = arch in configured_archs
+                break
+        
+        return arch_match
+
     def _verify_apt_checksums(self, dists_path: str, repo_path: str, dist_config: DistributionConfig, dist_name: str) -> Dict[str, Any]:
         """Verify SHA256 checksums for APT packages using Release file"""
         details = []
@@ -949,6 +983,7 @@ class RepositoryVerifier:
         total_count = 0
         missing_optional_count = 0
         debug_missing_count = 0
+        skipped_config_count = 0
         
         release_file = os.path.join(dists_path, 'Release')
         if not os.path.exists(release_file):
@@ -977,6 +1012,12 @@ class RepositoryVerifier:
                     parts = line.strip().split()
                     if len(parts) == 3:
                         expected_hash, size, filename = parts
+                        
+                        # Skip files that don't match our configuration
+                        if not self._should_verify_file(filename, dist_config):
+                            skipped_config_count += 1
+                            logger.debug(f'Skipping file not in configuration: {filename}')
+                            continue
                         
                         # In APT Release files, all paths are relative to the dists/<version> directory
                         file_path = os.path.join(dists_path, filename)
@@ -1035,6 +1076,10 @@ class RepositoryVerifier:
         # Add summary of optional files if any were missing
         if missing_optional_count > 0:
             logger.info(f'Skipped {missing_optional_count} optional files that were missing')
+        
+        # Add summary of files skipped due to configuration
+        if skipped_config_count > 0:
+            logger.info(f'Skipped {skipped_config_count} files not matching configuration (architectures/components)')
         
         return {
             'verified_count': verified_count,
