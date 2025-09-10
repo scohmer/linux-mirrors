@@ -998,20 +998,23 @@ class RepositoryVerifier:
                                     break
                         
                         if file_found:
-                            # For compressed variants, we can only verify if we're checking the same format
-                            # as listed in the Release file (since compression changes the hash)
                             if actual_file_path == file_path:
-                                # Uncompressed file matches Release file entry
+                                # Uncompressed file matches Release file entry exactly
                                 actual_hash = self._calculate_sha256(actual_file_path)
                                 if actual_hash == expected_hash:
                                     verified_count += 1
                                 else:
                                     details.append(f'Checksum mismatch for {filename}')
                             else:
-                                # We found a compressed variant, but can't verify against uncompressed hash
-                                # This is normal - the Release file should have separate entries for compressed files
-                                logger.debug(f'Found compressed variant of {filename}: {os.path.basename(actual_file_path)}')
-                                # Don't count as missing since the file exists in compressed form
+                                # We found a compressed variant - need to decompress and verify
+                                actual_hash = self._calculate_sha256_decompressed(actual_file_path)
+                                if actual_hash == expected_hash:
+                                    verified_count += 1
+                                    logger.debug(f'Verified compressed file {os.path.basename(actual_file_path)} against uncompressed hash')
+                                elif actual_hash:
+                                    details.append(f'Checksum mismatch for {filename} (decompressed from {os.path.basename(actual_file_path)})')
+                                else:
+                                    logger.debug(f'Could not decompress {actual_file_path} for verification')
                         else:
                             # Log first few missing files for debugging to understand the pattern
                             if debug_missing_count < 5:
@@ -1096,4 +1099,31 @@ class RepositoryVerifier:
             return hash_sha256.hexdigest()
         except Exception as e:
             logger.error(f"Error calculating SHA256 for {file_path}: {e}")
+            return ""
+    
+    def _calculate_sha256_decompressed(self, file_path: str) -> str:
+        """Calculate SHA256 hash of a compressed file's decompressed content"""
+        hash_sha256 = hashlib.sha256()
+        try:
+            if file_path.endswith('.gz'):
+                with gzip.open(file_path, 'rb') as f:
+                    for chunk in iter(lambda: f.read(4096), b""):
+                        hash_sha256.update(chunk)
+            elif file_path.endswith('.xz'):
+                import lzma
+                with lzma.open(file_path, 'rb') as f:
+                    for chunk in iter(lambda: f.read(4096), b""):
+                        hash_sha256.update(chunk)
+            elif file_path.endswith('.bz2'):
+                import bz2
+                with bz2.open(file_path, 'rb') as f:
+                    for chunk in iter(lambda: f.read(4096), b""):
+                        hash_sha256.update(chunk)
+            else:
+                logger.warning(f"Unknown compression format for {file_path}")
+                return ""
+            
+            return hash_sha256.hexdigest()
+        except Exception as e:
+            logger.error(f"Error calculating SHA256 for decompressed {file_path}: {e}")
             return ""
