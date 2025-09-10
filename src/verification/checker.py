@@ -901,19 +901,18 @@ class RepositoryVerifier:
             # DEP-11 metadata files - optional AppStream data
             'dep11/Components-',
             'dep11/icons-',
-            # Contents files for architectures that may not be present
-            'Contents-armel',
-            'Contents-armhf',
-            'Contents-arm64',
-            'Contents-ppc64el',
-            'Contents-riscv64',
-            'Contents-s390x',
+            # Contents files - these are large and often not mirrored or only in compressed form
+            'Contents-',
+            'contrib/Contents-',
+            'non-free/Contents-',
             # Binary package files for architectures that may not be mirrored
             'binary-armel/',
             'binary-armhf/',
             'binary-ppc64el/',
             'binary-riscv64/',
             'binary-s390x/',
+            # Source packages - often not mirrored in partial mirrors
+            'source/Sources',
         ]
         
         # Additional Ubuntu-specific optional files
@@ -983,12 +982,36 @@ class RepositoryVerifier:
                         file_path = os.path.join(dists_path, filename)
                         
                         total_count += 1
+                        
+                        # Check if file exists, or try compressed variants
+                        actual_file_path = file_path
                         if os.path.exists(file_path):
-                            actual_hash = self._calculate_sha256(file_path)
-                            if actual_hash == expected_hash:
-                                verified_count += 1
+                            file_found = True
+                        else:
+                            # Try common compressed variants
+                            compressed_variants = [f"{file_path}.gz", f"{file_path}.xz", f"{file_path}.bz2"]
+                            file_found = False
+                            for variant in compressed_variants:
+                                if os.path.exists(variant):
+                                    actual_file_path = variant
+                                    file_found = True
+                                    break
+                        
+                        if file_found:
+                            # For compressed variants, we can only verify if we're checking the same format
+                            # as listed in the Release file (since compression changes the hash)
+                            if actual_file_path == file_path:
+                                # Uncompressed file matches Release file entry
+                                actual_hash = self._calculate_sha256(actual_file_path)
+                                if actual_hash == expected_hash:
+                                    verified_count += 1
+                                else:
+                                    details.append(f'Checksum mismatch for {filename}')
                             else:
-                                details.append(f'Checksum mismatch for {filename}')
+                                # We found a compressed variant, but can't verify against uncompressed hash
+                                # This is normal - the Release file should have separate entries for compressed files
+                                logger.debug(f'Found compressed variant of {filename}: {os.path.basename(actual_file_path)}')
+                                # Don't count as missing since the file exists in compressed form
                         else:
                             # Log first few missing files for debugging to understand the pattern
                             if debug_missing_count < 5:
