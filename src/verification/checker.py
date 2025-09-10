@@ -27,12 +27,25 @@ class RepositoryVerifier:
                 '827C8569F2518CC677FECA1AED65462EC8D5E4C5': 'https://archive.kali.org/archive-key.asc'
             },
             'debian': {
+                # Current Debian signing keys
                 'DC30D7C23CBBABEE': 'https://ftp-master.debian.org/keys/archive-key-11.asc',
-                'E0B11894F66AEC98': 'https://ftp-master.debian.org/keys/archive-key-12.asc'
+                'E0B11894F66AEC98': 'https://ftp-master.debian.org/keys/archive-key-12.asc',
+                # Additional Debian keys from the logs
+                '8B48AD6246925553': 'https://ftp-master.debian.org/keys/archive-key-8.asc',
+                'A1BD8E9D78F7FE5C3E65D8AF8B48AD6246925553': 'https://ftp-master.debian.org/keys/archive-key-8.asc',
+                '16E90B3FDF65EDE3AA7F323C04EE7237B7D453EC': 'https://ftp-master.debian.org/keys/archive-key-9.asc', 
+                '0146DC6D4A0B2914BDED34DB648ACFD622F3D138': 'https://ftp-master.debian.org/keys/archive-key-10.asc',
+                'A7236886F3CCCAAD148A27F80E98404D386FA1D9': 'https://ftp-master.debian.org/keys/archive-key-10.asc',
+                '4CB50190207B4758A3F73A796ED0E7B82643E131': 'https://ftp-master.debian.org/keys/archive-key-11.asc',
             },
             'ubuntu': {
+                # Current Ubuntu signing keys
                 'C0B21F32': 'https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xC0B21F32',
-                '790BC7277767219C42C86F933B4FE6ACC0B21F32': 'https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x790BC7277767219C42C86F933B4FE6ACC0B21F32'
+                '790BC7277767219C42C86F933B4FE6ACC0B21F32': 'https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x790BC7277767219C42C86F933B4FE6ACC0B21F32',
+                '3B4FE6ACC0B21F32': 'https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xC0B21F32',
+                # Additional Ubuntu keys from the logs
+                '871920D1991BC93C': 'https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x871920D1991BC93C',
+                'F6ECB3762474EDA9D21B7022871920D1991BC93C': 'https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x871920D1991BC93C',
             }
         }
     
@@ -936,6 +949,7 @@ class RepositoryVerifier:
         verified_count = 0
         total_count = 0
         missing_optional_count = 0
+        debug_missing_count = 0
         
         release_file = os.path.join(dists_path, 'Release')
         if not os.path.exists(release_file):
@@ -964,6 +978,8 @@ class RepositoryVerifier:
                     parts = line.strip().split()
                     if len(parts) == 3:
                         expected_hash, size, filename = parts
+                        
+                        # In APT Release files, all paths are relative to the dists/<version> directory
                         file_path = os.path.join(dists_path, filename)
                         
                         total_count += 1
@@ -974,6 +990,11 @@ class RepositoryVerifier:
                             else:
                                 details.append(f'Checksum mismatch for {filename}')
                         else:
+                            # Log first few missing files for debugging to understand the pattern
+                            if debug_missing_count < 5:
+                                logger.warning(f'File not found ({dist_name}): {filename} -> {file_path}')
+                                debug_missing_count += 1
+                            
                             # Check if this is an optional file
                             if self._is_optional_file(filename, dist_name):
                                 missing_optional_count += 1
