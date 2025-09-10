@@ -50,6 +50,7 @@ Examples:
   %(prog)s setup-systemd --user              # Create systemd services for user
   %(prog)s status                             # Show container and sync status
   %(prog)s status --verify                    # Show status with repository verification
+  %(prog)s status --file-integrity            # Verify GPG signatures and SHA256 checksums
   %(prog)s debug                              # Launch debug interface
         """
     )
@@ -108,6 +109,8 @@ Examples:
     status_parser = subparsers.add_parser("status", help="Show system status")
     status_parser.add_argument("--verify", action="store_true", 
                               help="Verify repository integrity against local filesystem")
+    status_parser.add_argument("--file-integrity", action="store_true",
+                              help="Verify file integrity with GPG signatures and SHA256 checksums")
     
     # Debug command  
     subparsers.add_parser("debug", help="Launch debug interface")
@@ -228,7 +231,55 @@ def cmd_setup_systemd(args, config_manager: ConfigManager):
 
 def cmd_status(args, orchestrator: ContainerOrchestrator, storage_manager: StorageManager, config_manager: ConfigManager):
     """Handle status command"""
-    if args.verify:
+    if args.file_integrity:
+        # File integrity verification mode (GPG + SHA256)
+        print("=== Repository File Integrity Verification ===")
+        verifier = RepositoryVerifier(config_manager)
+        print("Checking GPG signatures and SHA256 checksums... (this may take several minutes)")
+        
+        verification_results = verifier.verify_all_repositories_integrity(check_signatures=True)
+        
+        # Summary
+        total = verification_results['total_repos']
+        verified = verification_results['verified']
+        failed = verification_results['failed']
+        missing = verification_results['missing']
+        gpg_verified = verification_results['gpg_verified']
+        checksums_verified = verification_results['total_checksums_verified']
+        files_checked = verification_results['total_files_checked']
+        
+        print(f"\nFile integrity verification: {total} total repositories")
+        print(f"  ✓ {verified} verified, ✗ {failed} failed, ? {missing} missing")
+        print(f"  GPG signatures verified: {gpg_verified}/{total} repositories")
+        print(f"  SHA256 checksums verified: {checksums_verified}/{files_checked} files")
+        
+        # Show verified repositories
+        verified_repos = [d for d in verification_results['details'] if d['status'] == 'verified']
+        if verified_repos:
+            print("\nVerified repositories:")
+            for detail in verified_repos:
+                gpg_status = "✓ GPG" if detail.get('gpg_verified', False) else "✗ GPG"
+                checksum_info = f"{detail.get('checksums_verified', 0)}/{detail.get('total_files_checked', 0)} checksums"
+                print(f"  ✓ {detail['distribution']} {detail['version']}: {gpg_status}, {checksum_info}")
+        
+        # Show issues
+        issues_found = False
+        for detail in verification_results['details']:
+            if detail['status'] in ['failed', 'missing']:
+                if not issues_found:
+                    print("\nIssues found:")
+                    issues_found = True
+                status_symbol = "✗" if detail['status'] == 'failed' else "?"
+                gpg_status = "✓ GPG" if detail.get('gpg_verified', False) else "✗ GPG"
+                checksum_info = f"{detail.get('checksums_verified', 0)}/{detail.get('total_files_checked', 0)} checksums"
+                print(f"  {status_symbol} {detail['distribution']} {detail['version']}: {detail['details']} ({gpg_status}, {checksum_info})")
+        
+        if not issues_found and not verified_repos:
+            print("\nNo repositories found or all repositories have issues")
+        
+        return 0
+    
+    elif args.verify:
         # Repository verification only mode
         print("=== Repository Verification ===")
         verifier = RepositoryVerifier(config_manager)

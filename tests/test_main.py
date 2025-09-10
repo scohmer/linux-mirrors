@@ -167,6 +167,14 @@ class TestArgumentParser:
         
         args = parser.parse_args(["status"])
         assert args.command == "status"
+        
+        args = parser.parse_args(["status", "--verify"])
+        assert args.command == "status"
+        assert args.verify is True
+        
+        args = parser.parse_args(["status", "--file-integrity"])
+        assert args.command == "status"
+        assert args.file_integrity is True
     
     def test_parser_debug_command(self):
         """Test debug command"""
@@ -407,6 +415,62 @@ class TestCommandHandlers:
         print_calls = [str(call) for call in mock_print.call_args_list]
         assert any("Containers: 1 running" in call for call in print_calls)
         assert any("Storage: 5 repositories" in call for call in print_calls)
+    
+    def test_cmd_status_file_integrity(self):
+        """Test status command with file integrity verification"""
+        args = Mock()
+        args.file_integrity = True
+        args.verify = False
+        
+        mock_orchestrator = Mock()
+        mock_storage_manager = Mock()
+        
+        # Mock RepositoryVerifier
+        mock_verifier = Mock()
+        mock_verifier.verify_all_repositories_integrity.return_value = {
+            'total_repos': 2,
+            'verified': 1,
+            'failed': 1,
+            'missing': 0,
+            'gpg_verified': 1,
+            'total_checksums_verified': 15,
+            'total_files_checked': 20,
+            'details': [
+                {
+                    'distribution': 'debian',
+                    'version': 'bookworm',
+                    'status': 'verified',
+                    'gpg_verified': True,
+                    'checksums_verified': 15,
+                    'total_files_checked': 15
+                },
+                {
+                    'distribution': 'ubuntu',
+                    'version': 'jammy',
+                    'status': 'failed',
+                    'details': 'GPG verification failed',
+                    'gpg_verified': False,
+                    'checksums_verified': 0,
+                    'total_files_checked': 5
+                }
+            ]
+        }
+        
+        with patch('src.main.RepositoryVerifier', return_value=mock_verifier), \
+             patch('builtins.print') as mock_print:
+            
+            result = cmd_status(args, mock_orchestrator, mock_storage_manager, self.mock_config_manager)
+        
+        assert result == 0
+        
+        # Check that the expected output was printed
+        print_calls = [str(call) for call in mock_print.call_args_list]
+        assert any("Repository File Integrity Verification" in call for call in print_calls)
+        assert any("GPG signatures verified: 1/2" in call for call in print_calls)
+        assert any("SHA256 checksums verified: 15/20" in call for call in print_calls)
+        
+        # Verify verifier was called correctly
+        mock_verifier.verify_all_repositories_integrity.assert_called_once_with(check_signatures=True)
     
     def test_cmd_storage_info(self):
         """Test storage info command"""

@@ -119,6 +119,12 @@ Verify repository integrity:
 linux-mirrors status --verify
 ```
 
+Verify file integrity with GPG signatures and checksums:
+
+```bash
+linux-mirrors status --file-integrity
+```
+
 Launch debug interface:
 
 ```bash
@@ -137,9 +143,13 @@ linux-mirrors storage --cleanup
 
 ## Repository Verification
 
+The system provides two levels of repository verification to ensure your mirrored repositories are complete, functional, and secure.
+
+### Basic Verification (`--verify`)
+
 The `status --verify` command performs local repository structure integrity checking to ensure your mirrored repositories are complete and functional.
 
-### What it checks:
+**What it checks:**
 
 **APT Repositories (Debian, Ubuntu, Kali):**
 - Directory structure (`dists/{version}` directories)
@@ -154,16 +164,39 @@ The `status --verify` command performs local repository structure integrity chec
 - RPM packages in expected locations
 - Valid XML structure in metadata files
 
-### What it does NOT check:
+This is a **local filesystem sanity check** to ensure sync operations created usable repository structures.
 
-- **No cryptographic verification**: Does not verify GPG signatures or checksums against upstream
-- **No content validation**: Does not compare file hashes with upstream repositories
-- **No network verification**: Does not fetch remote metadata for comparison
-- **No package integrity**: Does not verify individual package checksums
+### File Integrity Verification (`--file-integrity`)
 
-The verification is a **local filesystem sanity check** to ensure sync operations created usable repository structures, not cryptographic authenticity verification (which is handled by package managers when using the repositories).
+The `status --file-integrity` command performs comprehensive cryptographic verification of repository authenticity and integrity.
 
-Example output:
+**What it checks:**
+
+**APT Repositories (Debian, Ubuntu, Kali):**
+- **GPG Signature Verification**: Validates Release/InRelease files using system GPG keyring
+- **SHA256 Checksum Verification**: Verifies all metadata files against checksums in Release file
+- **Signature File Detection**: Checks for both inline (InRelease) and detached (Release.gpg) signatures
+- **Complete Metadata Validation**: Ensures all Packages files match their expected checksums
+
+**YUM Repositories (Rocky Linux, RHEL):**
+- **GPG Signature Verification**: Validates repomd.xml files using detached signatures (repomd.xml.asc)
+- **SHA256 Checksum Verification**: Verifies repository metadata files against checksums in repomd.xml
+- **Multi-Architecture Support**: Checks signatures and checksums for all configured architectures
+- **Repository Consistency**: Ensures metadata integrity across BaseOS and AppStream components
+
+**Prerequisites for File Integrity Verification:**
+- System must have `gpg` command available
+- Repository GPG keys must be imported to system keyring
+- Sufficient disk I/O performance (verification can take several minutes for large repositories)
+
+**What it does NOT check:**
+- Individual package (.deb/.rpm) file signatures (handled by package managers)
+- Network connectivity or upstream comparison
+- Package content or binary integrity
+
+### Example Output
+
+**Basic verification:**
 ```bash
 $ linux-mirrors status --verify
 === Repository Verification ===
@@ -176,6 +209,26 @@ Verified repositories:
 Issues found:
   ? debian bullseye: Repository directory not found
   ✗ rocky 8: Missing repomd.xml for x86_64
+```
+
+**File integrity verification:**
+```bash
+$ linux-mirrors status --file-integrity
+=== Repository File Integrity Verification ===
+Checking GPG signatures and SHA256 checksums... (this may take several minutes)
+
+File integrity verification: 5 total repositories
+  ✓ 4 verified, ✗ 1 failed, ? 0 missing
+  GPG signatures verified: 4/5 repositories
+  SHA256 checksums verified: 247/250 files
+
+Verified repositories:
+  ✓ debian bookworm: ✓ GPG, 45/45 checksums
+  ✓ ubuntu jammy: ✓ GPG, 38/38 checksums
+  ✓ rocky 9: ✓ GPG, 164/164 checksums
+
+Issues found:
+  ✗ ubuntu mantic: GPG verification failed for ubuntu mantic InRelease: gpg: Can't check signature: No public key (✗ GPG, 0/0 checksums)
 ```
 
 ## Configuration

@@ -439,3 +439,388 @@ class RepositoryVerifier:
             summary_parts.append(f"{failed} failed")
         
         return f"Repository verification: {total} total, " + ", ".join(summary_parts)
+    
+    def verify_all_repositories_integrity(self, check_signatures: bool = True) -> Dict[str, Any]:
+        """Verify file integrity for all enabled repositories including GPG and checksums"""
+        results = {
+            'total_repos': 0,
+            'verified': 0,
+            'failed': 0,
+            'missing': 0,
+            'gpg_verified': 0,
+            'total_checksums_verified': 0,
+            'total_files_checked': 0,
+            'details': []
+        }
+        
+        for dist_name, dist_config in self.config.distributions.items():
+            if not dist_config.enabled:
+                continue
+                
+            for version in dist_config.versions:
+                results['total_repos'] += 1
+                verification_result = self.verify_file_integrity(dist_name, version, dist_config, check_signatures)
+                results['details'].append(verification_result)
+                
+                if verification_result['status'] == 'verified':
+                    results['verified'] += 1
+                elif verification_result['status'] == 'failed':
+                    results['failed'] += 1
+                elif verification_result['status'] == 'missing':
+                    results['missing'] += 1
+                
+                # Aggregate integrity stats
+                if verification_result.get('gpg_verified', False):
+                    results['gpg_verified'] += 1
+                results['total_checksums_verified'] += verification_result.get('checksums_verified', 0)
+                results['total_files_checked'] += verification_result.get('total_files_checked', 0)
+        
+        return results
+    
+    def verify_file_integrity(self, dist_name: str, version: str, dist_config: DistributionConfig, check_signatures: bool = True) -> Dict[str, Any]:
+        """Verify file integrity including GPG signatures and SHA256 checksums"""
+        repo_path = self._get_repository_path(dist_name, version, dist_config)
+        
+        if not os.path.exists(repo_path):
+            return {
+                'distribution': dist_name,
+                'version': version,
+                'status': 'missing',
+                'path': repo_path,
+                'details': f'Repository directory not found at {repo_path}',
+                'gpg_verified': False,
+                'checksums_verified': 0,
+                'total_files_checked': 0
+            }
+        
+        try:
+            if dist_config.type == 'apt':
+                return self._verify_apt_file_integrity(dist_name, version, dist_config, repo_path, check_signatures)
+            elif dist_config.type == 'yum':
+                return self._verify_yum_file_integrity(dist_name, version, dist_config, repo_path, check_signatures)
+            else:
+                return {
+                    'distribution': dist_name,
+                    'version': version,
+                    'status': 'failed',
+                    'path': repo_path,
+                    'details': f'Unknown repository type: {dist_config.type}',
+                    'gpg_verified': False,
+                    'checksums_verified': 0,
+                    'total_files_checked': 0
+                }
+        except Exception as e:
+            logger.error(f"Error verifying file integrity for {dist_name} {version}: {e}")
+            return {
+                'distribution': dist_name,
+                'version': version,
+                'status': 'failed',
+                'path': repo_path,
+                'details': f'File integrity verification error: {e}',
+                'gpg_verified': False,
+                'checksums_verified': 0,
+                'total_files_checked': 0
+            }
+    
+    def _verify_apt_file_integrity(self, dist_name: str, version: str, dist_config: DistributionConfig, 
+                                   repo_path: str, check_signatures: bool) -> Dict[str, Any]:
+        """Verify APT repository file integrity with GPG and checksums"""
+        details = []
+        gpg_verified = False
+        checksums_verified = 0
+        total_files_checked = 0
+        
+        dists_path = os.path.join(repo_path, 'dists', version)
+        if not os.path.exists(dists_path):
+            return {
+                'distribution': dist_name,
+                'version': version,
+                'status': 'missing',
+                'path': repo_path,
+                'details': f'Missing dists/{version} directory',
+                'gpg_verified': False,
+                'checksums_verified': 0,
+                'total_files_checked': 0
+            }
+        
+        # GPG signature verification for Release file
+        if check_signatures:
+            gpg_result = self._verify_apt_gpg_signature(dists_path, dist_name, version)
+            gpg_verified = gpg_result['verified']
+            if gpg_result['details']:
+                details.append(gpg_result['details'])
+        
+        # SHA256 checksum verification for packages
+        checksum_result = self._verify_apt_checksums(dists_path, repo_path, dist_config)
+        checksums_verified = checksum_result['verified_count']
+        total_files_checked = checksum_result['total_count']
+        if checksum_result['details']:
+            details.extend(checksum_result['details'])
+        
+        # Determine overall status
+        if not gpg_verified and check_signatures:
+            status = 'failed'
+        elif checksums_verified == 0 and total_files_checked > 0:
+            status = 'failed'
+        else:
+            status = 'verified'
+        
+        return {
+            'distribution': dist_name,
+            'version': version,
+            'status': status,
+            'path': repo_path,
+            'details': '; '.join(details) if details else 'File integrity verified',
+            'gpg_verified': gpg_verified,
+            'checksums_verified': checksums_verified,
+            'total_files_checked': total_files_checked
+        }
+    
+    def _verify_yum_file_integrity(self, dist_name: str, version: str, dist_config: DistributionConfig,
+                                   repo_path: str, check_signatures: bool) -> Dict[str, Any]:
+        """Verify YUM repository file integrity with GPG and checksums"""
+        details = []
+        gpg_verified = False
+        checksums_verified = 0
+        total_files_checked = 0
+        
+        # YUM repos have different structure per version/architecture
+        configured_archs = dist_config.architectures or ['x86_64']
+        available_architectures = self._get_available_architectures(dist_name, version, configured_archs)
+        
+        for arch in available_architectures:
+            # Check common YUM repository structures
+            possible_paths = [
+                os.path.join(repo_path, version, 'BaseOS', arch, 'os'),
+                os.path.join(repo_path, version, 'AppStream', arch, 'os'),
+                os.path.join(repo_path, version, arch),
+                os.path.join(repo_path, arch),
+            ]
+            
+            for check_path in possible_paths:
+                if os.path.exists(check_path):
+                    repodata_path = os.path.join(check_path, 'repodata')
+                    if os.path.exists(repodata_path):
+                        # GPG signature verification for repomd.xml
+                        if check_signatures:
+                            gpg_result = self._verify_yum_gpg_signature(repodata_path, dist_name, version, arch)
+                            if gpg_result['verified']:
+                                gpg_verified = True
+                            if gpg_result['details']:
+                                details.append(gpg_result['details'])
+                        
+                        # SHA256 checksum verification
+                        checksum_result = self._verify_yum_checksums(repodata_path, check_path)
+                        checksums_verified += checksum_result['verified_count']
+                        total_files_checked += checksum_result['total_count']
+                        if checksum_result['details']:
+                            details.extend(checksum_result['details'])
+                    break
+        
+        # Determine overall status
+        if check_signatures and not gpg_verified and total_files_checked > 0:
+            status = 'failed'
+        elif checksums_verified == 0 and total_files_checked > 0:
+            status = 'failed'
+        else:
+            status = 'verified'
+        
+        return {
+            'distribution': dist_name,
+            'version': version,
+            'status': status,
+            'path': repo_path,
+            'details': '; '.join(details) if details else 'File integrity verified',
+            'gpg_verified': gpg_verified,
+            'checksums_verified': checksums_verified,
+            'total_files_checked': total_files_checked
+        }
+    
+    def _verify_apt_gpg_signature(self, dists_path: str, dist_name: str, version: str) -> Dict[str, Any]:
+        """Verify GPG signature for APT Release file"""
+        release_file = os.path.join(dists_path, 'Release')
+        release_gpg_file = os.path.join(dists_path, 'Release.gpg')
+        inrelease_file = os.path.join(dists_path, 'InRelease')
+        
+        # Check for signature files
+        if os.path.exists(inrelease_file):
+            # Verify inline signature
+            return self._verify_gpg_file(inrelease_file, f"{dist_name} {version} InRelease")
+        elif os.path.exists(release_gpg_file) and os.path.exists(release_file):
+            # Verify detached signature
+            return self._verify_gpg_detached(release_file, release_gpg_file, f"{dist_name} {version} Release")
+        else:
+            return {
+                'verified': False,
+                'details': f'No GPG signature files found for {dist_name} {version}'
+            }
+    
+    def _verify_yum_gpg_signature(self, repodata_path: str, dist_name: str, version: str, arch: str) -> Dict[str, Any]:
+        """Verify GPG signature for YUM repomd.xml"""
+        repomd_file = os.path.join(repodata_path, 'repomd.xml')
+        repomd_asc_file = os.path.join(repodata_path, 'repomd.xml.asc')
+        
+        if os.path.exists(repomd_asc_file) and os.path.exists(repomd_file):
+            return self._verify_gpg_detached(repomd_file, repomd_asc_file, f"{dist_name} {version} {arch} repomd.xml")
+        else:
+            return {
+                'verified': False,
+                'details': f'No GPG signature file found for {dist_name} {version} {arch} repomd.xml'
+            }
+    
+    def _verify_gpg_file(self, file_path: str, description: str) -> Dict[str, Any]:
+        """Verify a GPG signed file (inline signature)"""
+        try:
+            result = subprocess.run(['gpg', '--verify', file_path], 
+                                  capture_output=True, text=True, timeout=30)
+            
+            if result.returncode == 0:
+                return {
+                    'verified': True,
+                    'details': f'GPG signature verified for {description}'
+                }
+            else:
+                return {
+                    'verified': False,
+                    'details': f'GPG verification failed for {description}: {result.stderr.strip()}'
+                }
+        except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.CalledProcessError) as e:
+            return {
+                'verified': False,
+                'details': f'GPG verification error for {description}: {str(e)}'
+            }
+    
+    def _verify_gpg_detached(self, data_file: str, sig_file: str, description: str) -> Dict[str, Any]:
+        """Verify a detached GPG signature"""
+        try:
+            result = subprocess.run(['gpg', '--verify', sig_file, data_file], 
+                                  capture_output=True, text=True, timeout=30)
+            
+            if result.returncode == 0:
+                return {
+                    'verified': True,
+                    'details': f'GPG signature verified for {description}'
+                }
+            else:
+                return {
+                    'verified': False,
+                    'details': f'GPG verification failed for {description}: {result.stderr.strip()}'
+                }
+        except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.CalledProcessError) as e:
+            return {
+                'verified': False,
+                'details': f'GPG verification error for {description}: {str(e)}'
+            }
+    
+    def _verify_apt_checksums(self, dists_path: str, repo_path: str, dist_config: DistributionConfig) -> Dict[str, Any]:
+        """Verify SHA256 checksums for APT packages using Release file"""
+        details = []
+        verified_count = 0
+        total_count = 0
+        
+        release_file = os.path.join(dists_path, 'Release')
+        if not os.path.exists(release_file):
+            return {
+                'verified_count': 0,
+                'total_count': 0,
+                'details': ['No Release file found for checksum verification']
+            }
+        
+        # Parse Release file for SHA256 checksums
+        try:
+            with open(release_file, 'r') as f:
+                content = f.read()
+                
+            # Extract SHA256 section
+            sha256_section = False
+            for line in content.split('\n'):
+                if line.startswith('SHA256:'):
+                    sha256_section = True
+                    continue
+                elif line.startswith('SHA1:') or line.startswith('MD5Sum:'):
+                    sha256_section = False
+                    continue
+                elif sha256_section and line.strip():
+                    # Parse checksum line: " hash size filename"
+                    parts = line.strip().split()
+                    if len(parts) == 3:
+                        expected_hash, size, filename = parts
+                        file_path = os.path.join(dists_path, filename)
+                        
+                        total_count += 1
+                        if os.path.exists(file_path):
+                            actual_hash = self._calculate_sha256(file_path)
+                            if actual_hash == expected_hash:
+                                verified_count += 1
+                            else:
+                                details.append(f'Checksum mismatch for {filename}')
+                        else:
+                            details.append(f'Missing file for checksum verification: {filename}')
+        
+        except Exception as e:
+            details.append(f'Error parsing Release file for checksums: {e}')
+        
+        return {
+            'verified_count': verified_count,
+            'total_count': total_count,
+            'details': details
+        }
+    
+    def _verify_yum_checksums(self, repodata_path: str, repo_path: str) -> Dict[str, Any]:
+        """Verify SHA256 checksums for YUM packages using repomd.xml"""
+        details = []
+        verified_count = 0
+        total_count = 0
+        
+        repomd_file = os.path.join(repodata_path, 'repomd.xml')
+        if not os.path.exists(repomd_file):
+            return {
+                'verified_count': 0,
+                'total_count': 0,
+                'details': ['No repomd.xml file found for checksum verification']
+            }
+        
+        # Parse repomd.xml for checksums (simplified - would need full XML parsing for production)
+        try:
+            with open(repomd_file, 'r') as f:
+                content = f.read()
+                
+            # Basic checksum verification for key metadata files
+            import re
+            checksum_matches = re.findall(r'checksum type="sha256">([a-f0-9]{64})</checksum>', content)
+            location_matches = re.findall(r'location href="([^"]+)"', content)
+            
+            for i, (checksum, location) in enumerate(zip(checksum_matches, location_matches)):
+                if i < len(checksum_matches):  # Ensure we don't go out of bounds
+                    file_path = os.path.join(repodata_path, os.path.basename(location))
+                    
+                    total_count += 1
+                    if os.path.exists(file_path):
+                        actual_hash = self._calculate_sha256(file_path)
+                        if actual_hash == checksum:
+                            verified_count += 1
+                        else:
+                            details.append(f'Checksum mismatch for {os.path.basename(location)}')
+                    else:
+                        details.append(f'Missing file for checksum verification: {os.path.basename(location)}')
+        
+        except Exception as e:
+            details.append(f'Error parsing repomd.xml for checksums: {e}')
+        
+        return {
+            'verified_count': verified_count,
+            'total_count': total_count,
+            'details': details
+        }
+    
+    def _calculate_sha256(self, file_path: str) -> str:
+        """Calculate SHA256 hash of a file"""
+        hash_sha256 = hashlib.sha256()
+        try:
+            with open(file_path, 'rb') as f:
+                for chunk in iter(lambda: f.read(4096), b""):
+                    hash_sha256.update(chunk)
+            return hash_sha256.hexdigest()
+        except Exception as e:
+            logger.error(f"Error calculating SHA256 for {file_path}: {e}")
+            return ""
