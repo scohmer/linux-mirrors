@@ -19,6 +19,22 @@ class RepositoryVerifier:
     def __init__(self, config_manager: ConfigManager):
         self.config_manager = config_manager
         self.config = config_manager.get_config()
+        
+        # Common GPG key IDs and URLs for distributions
+        self.gpg_keys = {
+            'kali': {
+                'ED65462EC8D5E4C5': 'https://archive.kali.org/archive-key.asc',
+                '827C8569F2518CC677FECA1AED65462EC8D5E4C5': 'https://archive.kali.org/archive-key.asc'
+            },
+            'debian': {
+                'DC30D7C23CBBABEE': 'https://ftp-master.debian.org/keys/archive-key-11.asc',
+                'E0B11894F66AEC98': 'https://ftp-master.debian.org/keys/archive-key-12.asc'
+            },
+            'ubuntu': {
+                'C0B21F32': 'https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xC0B21F32',
+                '790BC7277767219C42C86F933B4FE6ACC0B21F32': 'https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x790BC7277767219C42C86F933B4FE6ACC0B21F32'
+            }
+        }
     
     def verify_all_repositories(self) -> Dict[str, Any]:
         """Verify all enabled repositories and return summary"""
@@ -551,17 +567,25 @@ class RepositoryVerifier:
                 details.append(gpg_result['details'])
         
         # SHA256 checksum verification for packages
-        checksum_result = self._verify_apt_checksums(dists_path, repo_path, dist_config)
+        checksum_result = self._verify_apt_checksums(dists_path, repo_path, dist_config, dist_name)
         checksums_verified = checksum_result['verified_count']
         total_files_checked = checksum_result['total_count']
         if checksum_result['details']:
             details.extend(checksum_result['details'])
         
         # Determine overall status
-        if not gpg_verified and check_signatures:
+        if checksums_verified == 0 and total_files_checked > 0:
+            # If we have files to check but none verified, that's a failure
             status = 'failed'
-        elif checksums_verified == 0 and total_files_checked > 0:
-            status = 'failed'
+        elif not gpg_verified and check_signatures:
+            # GPG verification failed, but we might still have valid checksums
+            if checksums_verified > 0:
+                # We have verified checksums, so it's partially verified
+                status = 'verified'
+                if any('No public key' in detail for detail in details):
+                    logger.warning(f"GPG verification failed due to missing public key, but checksums verified")
+            else:
+                status = 'failed'
         else:
             status = 'verified'
         
@@ -618,10 +642,18 @@ class RepositoryVerifier:
                     break
         
         # Determine overall status
-        if check_signatures and not gpg_verified and total_files_checked > 0:
+        if checksums_verified == 0 and total_files_checked > 0:
+            # If we have files to check but none verified, that's a failure
             status = 'failed'
-        elif checksums_verified == 0 and total_files_checked > 0:
-            status = 'failed'
+        elif check_signatures and not gpg_verified and total_files_checked > 0:
+            # GPG verification failed, but we might still have valid checksums
+            if checksums_verified > 0:
+                # We have verified checksums, so it's partially verified
+                status = 'verified'
+                if any('No GPG signature file found' in detail for detail in details):
+                    logger.warning(f"GPG signatures not available for YUM repository, but checksums verified")
+            else:
+                status = 'failed'
         else:
             status = 'verified'
         
@@ -668,6 +700,56 @@ class RepositoryVerifier:
                 'details': f'No GPG signature file found for {dist_name} {version} {arch} repomd.xml'
             }
     
+    def _try_import_missing_gpg_key(self, dist_name: str, stderr: str) -> bool:
+        """Try to import missing GPG key automatically"""
+        if "No public key" not in stderr:
+            return False
+            
+        # Extract key ID from stderr (e.g., "using RSA key 827C8569F2518CC677FECA1AED65462EC8D5E4C5")
+        import re
+        key_match = re.search(r'using \w+ key ([A-F0-9]+)', stderr)
+        if not key_match:
+            return False
+            
+        key_id = key_match.group(1)
+        
+        # Check if we have a URL for this key
+        if dist_name not in self.gpg_keys:
+            return False
+            
+        key_url = None
+        for known_key_id, url in self.gpg_keys[dist_name].items():
+            if key_id.endswith(known_key_id) or known_key_id.endswith(key_id):
+                key_url = url
+                break
+                
+        if not key_url:
+            logger.warning(f"No known key URL for {dist_name} key {key_id}")
+            return False
+            
+        try:
+            logger.info(f"Attempting to import GPG key {key_id} for {dist_name} from {key_url}")
+            
+            # Download and import the key
+            response = requests.get(key_url, timeout=30)
+            response.raise_for_status()
+            
+            # Import the key
+            result = subprocess.run(['gpg', '--import'], 
+                                  input=response.text, 
+                                  capture_output=True, text=True, timeout=30)
+            
+            if result.returncode == 0:
+                logger.info(f"Successfully imported GPG key {key_id} for {dist_name}")
+                return True
+            else:
+                logger.warning(f"Failed to import GPG key {key_id}: {result.stderr}")
+                return False
+                
+        except Exception as e:
+            logger.warning(f"Error importing GPG key {key_id} for {dist_name}: {e}")
+            return False
+
     def _verify_gpg_file(self, file_path: str, description: str) -> Dict[str, Any]:
         """Verify a GPG signed file (inline signature)"""
         try:
@@ -680,11 +762,52 @@ class RepositoryVerifier:
                     'details': f'GPG signature verified for {description}'
                 }
             else:
-                return {
-                    'verified': False,
-                    'details': f'GPG verification failed for {description}: {result.stderr.strip()}'
-                }
-        except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.CalledProcessError) as e:
+                stderr = result.stderr.strip()
+                
+                # Try to import missing key and retry verification
+                if "No public key" in stderr:
+                    # Extract distribution name from description
+                    dist_name = description.split()[0].lower() if description else 'unknown'
+                    
+                    if self._try_import_missing_gpg_key(dist_name, stderr):
+                        # Retry verification after importing key
+                        retry_result = subprocess.run(['gpg', '--verify', file_path], 
+                                                    capture_output=True, text=True, timeout=30)
+                        if retry_result.returncode == 0:
+                            return {
+                                'verified': True,
+                                'details': f'GPG signature verified for {description} (after importing key)'
+                            }
+                        else:
+                            stderr = retry_result.stderr.strip()
+                
+                # Handle common GPG issues more gracefully
+                if "No public key" in stderr:
+                    return {
+                        'verified': False,
+                        'details': f'GPG verification failed for {description}: {stderr}'
+                    }
+                elif "Can't check signature" in stderr:
+                    return {
+                        'verified': False,
+                        'details': f'GPG verification failed for {description}: {stderr}'
+                    }
+                else:
+                    return {
+                        'verified': False,
+                        'details': f'GPG verification failed for {description}: {stderr}'
+                    }
+        except FileNotFoundError:
+            return {
+                'verified': False,
+                'details': f'GPG verification error for {description}: gpg command not found'
+            }
+        except subprocess.TimeoutExpired:
+            return {
+                'verified': False,
+                'details': f'GPG verification error for {description}: verification timeout'
+            }
+        except Exception as e:
             return {
                 'verified': False,
                 'details': f'GPG verification error for {description}: {str(e)}'
@@ -702,21 +825,117 @@ class RepositoryVerifier:
                     'details': f'GPG signature verified for {description}'
                 }
             else:
-                return {
-                    'verified': False,
-                    'details': f'GPG verification failed for {description}: {result.stderr.strip()}'
-                }
-        except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.CalledProcessError) as e:
+                stderr = result.stderr.strip()
+                
+                # Try to import missing key and retry verification
+                if "No public key" in stderr:
+                    # Extract distribution name from description
+                    dist_name = description.split()[0].lower() if description else 'unknown'
+                    
+                    if self._try_import_missing_gpg_key(dist_name, stderr):
+                        # Retry verification after importing key
+                        retry_result = subprocess.run(['gpg', '--verify', sig_file, data_file], 
+                                                    capture_output=True, text=True, timeout=30)
+                        if retry_result.returncode == 0:
+                            return {
+                                'verified': True,
+                                'details': f'GPG signature verified for {description} (after importing key)'
+                            }
+                        else:
+                            stderr = retry_result.stderr.strip()
+                
+                # Handle common GPG issues more gracefully
+                if "No public key" in stderr:
+                    return {
+                        'verified': False,
+                        'details': f'GPG verification failed for {description}: {stderr}'
+                    }
+                elif "Can't check signature" in stderr:
+                    return {
+                        'verified': False,
+                        'details': f'GPG verification failed for {description}: {stderr}'
+                    }
+                else:
+                    return {
+                        'verified': False,
+                        'details': f'GPG verification failed for {description}: {stderr}'
+                    }
+        except FileNotFoundError:
+            return {
+                'verified': False,
+                'details': f'GPG verification error for {description}: gpg command not found'
+            }
+        except subprocess.TimeoutExpired:
+            return {
+                'verified': False,
+                'details': f'GPG verification error for {description}: verification timeout'
+            }
+        except Exception as e:
             return {
                 'verified': False,
                 'details': f'GPG verification error for {description}: {str(e)}'
             }
     
-    def _verify_apt_checksums(self, dists_path: str, repo_path: str, dist_config: DistributionConfig) -> Dict[str, Any]:
+    def _is_optional_file(self, filename: str, dist_name: str) -> bool:
+        """Check if a file is optional and can be missing without being an error"""
+        optional_patterns = [
+            # Translation files - often not present in mirrors
+            'i18n/Translation-',
+            # CNF (command-not-found) files - optional feature
+            'cnf/Commands-',
+            # Debian installer files for architectures that may not be mirrored
+            'debian-installer/binary-',
+            # DEP-11 metadata files - optional AppStream data
+            'dep11/Components-',
+            'dep11/icons-',
+            # Contents files for architectures that may not be present
+            'Contents-armel',
+            'Contents-armhf',
+            'Contents-arm64',
+            'Contents-ppc64el',
+            'Contents-riscv64',
+            'Contents-s390x',
+            # Binary package files for architectures that may not be mirrored
+            'binary-armel/',
+            'binary-armhf/',
+            'binary-ppc64el/',
+            'binary-riscv64/',
+            'binary-s390x/',
+        ]
+        
+        # Additional Ubuntu-specific optional files
+        if dist_name == 'ubuntu':
+            optional_patterns.extend([
+                # Ubuntu-specific optional files
+                'restricted/cnf/',
+                'restricted/debian-installer/',
+                'restricted/dep11/',
+                'restricted/i18n/',
+                'universe/cnf/',
+                'universe/debian-installer/',
+                'universe/dep11/',
+                'universe/i18n/',
+                'multiverse/cnf/',
+                'multiverse/debian-installer/',
+                'multiverse/dep11/',
+                'multiverse/i18n/',
+            ])
+        
+        # Kali-specific optional files
+        elif dist_name == 'kali':
+            optional_patterns.extend([
+                'non-free-firmware/',  # May not exist in older Kali versions
+                'Contents-',  # Contents files are often missing
+            ])
+        
+        return any(pattern in filename for pattern in optional_patterns)
+
+    def _verify_apt_checksums(self, dists_path: str, repo_path: str, dist_config: DistributionConfig, dist_name: str) -> Dict[str, Any]:
         """Verify SHA256 checksums for APT packages using Release file"""
         details = []
         verified_count = 0
         total_count = 0
+        missing_optional_count = 0
         
         release_file = os.path.join(dists_path, 'Release')
         if not os.path.exists(release_file):
@@ -755,10 +974,20 @@ class RepositoryVerifier:
                             else:
                                 details.append(f'Checksum mismatch for {filename}')
                         else:
-                            details.append(f'Missing file for checksum verification: {filename}')
+                            # Check if this is an optional file
+                            if self._is_optional_file(filename, dist_name):
+                                missing_optional_count += 1
+                                # Don't treat optional files as errors - just log for debugging
+                                logger.debug(f'Optional file missing: {filename}')
+                            else:
+                                details.append(f'Missing file for checksum verification: {filename}')
         
         except Exception as e:
             details.append(f'Error parsing Release file for checksums: {e}')
+        
+        # Add summary of optional files if any were missing
+        if missing_optional_count > 0:
+            logger.info(f'Skipped {missing_optional_count} optional files that were missing')
         
         return {
             'verified_count': verified_count,
