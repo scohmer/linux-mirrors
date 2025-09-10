@@ -51,6 +51,7 @@ Examples:
   %(prog)s status                             # Show container and sync status
   %(prog)s status --verify                    # Show status with repository verification
   %(prog)s status --file-integrity            # Verify GPG signatures and SHA256 checksums
+  %(prog)s status --file-integrity --workers 8 # Use 8 parallel workers for faster verification
   %(prog)s debug                              # Launch debug interface
         """
     )
@@ -111,6 +112,8 @@ Examples:
                               help="Verify repository integrity against local filesystem")
     status_parser.add_argument("--file-integrity", action="store_true",
                               help="Verify file integrity with GPG signatures and SHA256 checksums")
+    status_parser.add_argument("--workers", "-w", type=int, default=None,
+                              help="Number of parallel workers for file integrity verification (default: auto-detect)")
     
     # Debug command  
     subparsers.add_parser("debug", help="Launch debug interface")
@@ -235,9 +238,10 @@ def cmd_status(args, orchestrator: ContainerOrchestrator, storage_manager: Stora
         # File integrity verification mode (GPG + SHA256)
         print("=== Repository File Integrity Verification ===")
         verifier = RepositoryVerifier(config_manager)
-        print("Checking GPG signatures and SHA256 checksums... (this may take several minutes)")
+        worker_count = args.workers if args.workers else "auto-detected"
+        print(f"Checking GPG signatures and SHA256 checksums using {worker_count} workers... (this may take several minutes)")
         
-        verification_results = verifier.verify_all_repositories_integrity(check_signatures=True)
+        verification_results = verifier.verify_all_repositories_integrity(check_signatures=True, max_workers=args.workers)
         
         # Summary
         total = verification_results['total_repos']

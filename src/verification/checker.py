@@ -10,6 +10,8 @@ from urllib.parse import urljoin
 import requests
 import gzip
 import tempfile
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import multiprocessing
 
 from config.manager import ConfigManager, DistributionConfig
 
@@ -469,8 +471,8 @@ class RepositoryVerifier:
         
         return f"Repository verification: {total} total, " + ", ".join(summary_parts)
     
-    def verify_all_repositories_integrity(self, check_signatures: bool = True) -> Dict[str, Any]:
-        """Verify file integrity for all enabled repositories including GPG and checksums"""
+    def verify_all_repositories_integrity(self, check_signatures: bool = True, max_workers: Optional[int] = None) -> Dict[str, Any]:
+        """Verify file integrity for all enabled repositories including GPG and checksums with parallel processing"""
         results = {
             'total_repos': 0,
             'verified': 0,
@@ -484,30 +486,82 @@ class RepositoryVerifier:
             'details': []
         }
         
+        # Collect all repository tasks
+        repository_tasks = []
         for dist_name, dist_config in self.config.distributions.items():
             if not dist_config.enabled:
                 continue
-                
             for version in dist_config.versions:
                 results['total_repos'] += 1
-                verification_result = self.verify_file_integrity(dist_name, version, dist_config, check_signatures)
-                results['details'].append(verification_result)
-                
-                if verification_result['status'] == 'verified':
-                    results['verified'] += 1
-                elif verification_result['status'] == 'failed':
-                    results['failed'] += 1
-                elif verification_result['status'] == 'missing':
-                    results['missing'] += 1
-                
-                # Aggregate integrity stats
-                if verification_result.get('gpg_verified', False):
-                    results['gpg_verified'] += 1
-                results['total_checksums_verified'] += verification_result.get('checksums_verified', 0)
-                results['total_files_checked'] += verification_result.get('total_files_checked', 0)
-                results['total_packages_verified'] += verification_result.get('packages_verified', 0)
-                results['total_packages_checked'] += verification_result.get('total_packages', 0)
+                repository_tasks.append((dist_name, version, dist_config, check_signatures))
         
+        if not repository_tasks:
+            return results
+        
+        # Determine optimal number of workers
+        if max_workers is None:
+            # Use CPU count for I/O bound operations like file reads and hashing
+            max_workers = min(len(repository_tasks), max(2, multiprocessing.cpu_count()))
+        
+        logger.info(f"Starting parallel verification of {len(repository_tasks)} repositories using {max_workers} workers")
+        
+        # Process repositories in parallel
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all tasks
+            future_to_repo = {
+                executor.submit(self.verify_file_integrity, dist_name, version, dist_config, check_signatures): 
+                (dist_name, version) 
+                for dist_name, version, dist_config, check_signatures in repository_tasks
+            }
+            
+            # Collect results as they complete
+            completed_count = 0
+            for future in as_completed(future_to_repo):
+                dist_name, version = future_to_repo[future]
+                completed_count += 1
+                
+                try:
+                    verification_result = future.result()
+                    results['details'].append(verification_result)
+                    
+                    # Update status counters
+                    if verification_result['status'] == 'verified':
+                        results['verified'] += 1
+                    elif verification_result['status'] == 'failed':
+                        results['failed'] += 1
+                    elif verification_result['status'] == 'missing':
+                        results['missing'] += 1
+                    
+                    # Aggregate integrity stats
+                    if verification_result.get('gpg_verified', False):
+                        results['gpg_verified'] += 1
+                    results['total_checksums_verified'] += verification_result.get('checksums_verified', 0)
+                    results['total_files_checked'] += verification_result.get('total_files_checked', 0)
+                    results['total_packages_verified'] += verification_result.get('packages_verified', 0)
+                    results['total_packages_checked'] += verification_result.get('total_packages', 0)
+                    
+                    # Log progress
+                    logger.info(f"Completed verification {completed_count}/{len(repository_tasks)}: {dist_name} {version}")
+                    
+                except Exception as e:
+                    logger.error(f"Error verifying {dist_name} {version}: {e}")
+                    # Create a failed result for the exception
+                    error_result = {
+                        'distribution': dist_name,
+                        'version': version,
+                        'status': 'failed',
+                        'path': 'unknown',
+                        'details': f'Verification failed with exception: {e}',
+                        'gpg_verified': False,
+                        'checksums_verified': 0,
+                        'total_files_checked': 0,
+                        'packages_verified': 0,
+                        'total_packages': 0
+                    }
+                    results['details'].append(error_result)
+                    results['failed'] += 1
+        
+        logger.info(f"Parallel verification completed: {results['verified']} verified, {results['failed']} failed, {results['missing']} missing")
         return results
     
     def verify_file_integrity(self, dist_name: str, version: str, dist_config: DistributionConfig, check_signatures: bool = True) -> Dict[str, Any]:
@@ -1201,7 +1255,7 @@ class RepositoryVerifier:
     
     def _verify_apt_packages(self, dists_path: str, repo_path: str, dist_config: DistributionConfig, 
                             dist_name: str, version: str) -> Dict[str, Any]:
-        """Verify individual .deb packages using SHA256 hashes from Packages files"""
+        """Verify individual .deb packages using SHA256 hashes from Packages files with parallel processing"""
         details = []
         verified_count = 0
         total_count = 0
@@ -1209,6 +1263,9 @@ class RepositoryVerifier:
         # Get architectures that were actually available for this distribution version
         configured_archs = dist_config.architectures or ['amd64']
         available_architectures = self._get_available_architectures(dist_name, version, configured_archs)
+        
+        # Collect all package verification tasks
+        package_tasks = []
         
         for component in dist_config.components or ['main']:
             for arch in available_architectures:
@@ -1229,7 +1286,7 @@ class RepositoryVerifier:
                     logger.debug(f'No Packages file found for {component}/{arch}')
                     continue
                 
-                # Parse Packages file
+                # Parse Packages file and add tasks
                 try:
                     package_info = self._parse_packages_file(packages_path)
                     
@@ -1239,34 +1296,81 @@ class RepositoryVerifier:
                         
                         filename = package['Filename']
                         expected_sha256 = package['SHA256']
-                        
-                        # Construct full path to .deb file
                         deb_path = os.path.join(repo_path, filename)
                         
+                        package_tasks.append((deb_path, filename, expected_sha256))
                         total_count += 1
-                        
-                        if os.path.exists(deb_path):
-                            # Verify SHA256 checksum
-                            actual_sha256 = self._calculate_sha256(deb_path)
-                            if actual_sha256 == expected_sha256:
-                                verified_count += 1
-                                logger.debug(f'Verified package: {os.path.basename(filename)}')
-                            else:
-                                details.append(f'Package checksum mismatch: {os.path.basename(filename)}')
-                                logger.warning(f'SHA256 mismatch for {filename}: expected {expected_sha256}, got {actual_sha256}')
-                        else:
-                            details.append(f'Missing package file: {filename}')
-                            logger.debug(f'Missing package file: {deb_path}')
                 
                 except Exception as e:
                     details.append(f'Error parsing Packages file for {component}/{arch}: {e}')
                     logger.error(f'Error parsing {packages_path}: {e}')
+        
+        if not package_tasks:
+            return {
+                'verified_count': 0,
+                'total_count': 0,
+                'details': details
+            }
+        
+        # Process packages in parallel (but use fewer workers to avoid overwhelming the system)
+        max_workers = min(len(package_tasks), max(2, multiprocessing.cpu_count() // 2))
+        
+        logger.debug(f"Verifying {len(package_tasks)} packages for {dist_name} {version} using {max_workers} workers")
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all package verification tasks
+            future_to_package = {
+                executor.submit(self._verify_package_checksum, deb_path, filename, expected_sha256): 
+                (deb_path, filename, expected_sha256)
+                for deb_path, filename, expected_sha256 in package_tasks
+            }
+            
+            # Collect results as they complete
+            for future in as_completed(future_to_package):
+                deb_path, filename, expected_sha256 = future_to_package[future]
+                
+                try:
+                    verification_result = future.result()
+                    if verification_result['verified']:
+                        verified_count += 1
+                        logger.debug(f'Verified package: {os.path.basename(filename)}')
+                    else:
+                        details.append(verification_result['error'])
+                        if 'mismatch' in verification_result['error'].lower():
+                            logger.warning(f"SHA256 mismatch for {filename}: expected {expected_sha256}")
+                        
+                except Exception as e:
+                    details.append(f'Error verifying package {os.path.basename(filename)}: {e}')
+                    logger.error(f'Error verifying {filename}: {e}')
+        
+        logger.debug(f"Package verification completed for {dist_name} {version}: {verified_count}/{total_count} verified")
         
         return {
             'verified_count': verified_count,
             'total_count': total_count,
             'details': details
         }
+    
+    def _verify_package_checksum(self, deb_path: str, filename: str, expected_sha256: str) -> Dict[str, Any]:
+        """Verify a single package's SHA256 checksum"""
+        if not os.path.exists(deb_path):
+            return {
+                'verified': False,
+                'error': f'Missing package file: {filename}'
+            }
+        
+        # Verify SHA256 checksum
+        actual_sha256 = self._calculate_sha256(deb_path)
+        if actual_sha256 == expected_sha256:
+            return {
+                'verified': True,
+                'error': None
+            }
+        else:
+            return {
+                'verified': False,
+                'error': f'Package checksum mismatch: {os.path.basename(filename)}'
+            }
     
     def _parse_packages_file(self, packages_path: str) -> List[Dict[str, str]]:
         """Parse APT Packages file and extract package information"""
