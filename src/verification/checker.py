@@ -479,6 +479,8 @@ class RepositoryVerifier:
             'gpg_verified': 0,
             'total_checksums_verified': 0,
             'total_files_checked': 0,
+            'total_packages_verified': 0,
+            'total_packages_checked': 0,
             'details': []
         }
         
@@ -503,6 +505,8 @@ class RepositoryVerifier:
                     results['gpg_verified'] += 1
                 results['total_checksums_verified'] += verification_result.get('checksums_verified', 0)
                 results['total_files_checked'] += verification_result.get('total_files_checked', 0)
+                results['total_packages_verified'] += verification_result.get('packages_verified', 0)
+                results['total_packages_checked'] += verification_result.get('total_packages', 0)
         
         return results
     
@@ -586,6 +590,13 @@ class RepositoryVerifier:
         if checksum_result['details']:
             details.extend(checksum_result['details'])
         
+        # Package-level verification (.deb files)
+        package_result = self._verify_apt_packages(dists_path, repo_path, dist_config, dist_name, version)
+        packages_verified = package_result['verified_count']
+        total_packages = package_result['total_count']
+        if package_result['details']:
+            details.extend(package_result['details'])
+        
         # Determine overall status
         if checksums_verified == 0 and total_files_checked > 0:
             # If we have files to check but none verified, that's a failure
@@ -610,7 +621,9 @@ class RepositoryVerifier:
             'details': '; '.join(details) if details else 'File integrity verified',
             'gpg_verified': gpg_verified,
             'checksums_verified': checksums_verified,
-            'total_files_checked': total_files_checked
+            'total_files_checked': total_files_checked,
+            'packages_verified': packages_verified,
+            'total_packages': total_packages
         }
     
     def _verify_yum_file_integrity(self, dist_name: str, version: str, dist_config: DistributionConfig,
@@ -1172,3 +1185,125 @@ class RepositoryVerifier:
         except Exception as e:
             logger.error(f"Error calculating SHA256 for decompressed {file_path}: {e}")
             return ""
+    
+    def _verify_apt_packages(self, dists_path: str, repo_path: str, dist_config: DistributionConfig, 
+                            dist_name: str, version: str) -> Dict[str, Any]:
+        """Verify individual .deb packages using SHA256 hashes from Packages files"""
+        details = []
+        verified_count = 0
+        total_count = 0
+        
+        # Get architectures that were actually available for this distribution version
+        configured_archs = dist_config.architectures or ['amd64']
+        available_architectures = self._get_available_architectures(dist_name, version, configured_archs)
+        
+        for component in dist_config.components or ['main']:
+            for arch in available_architectures:
+                # Find Packages file (compressed or uncompressed)
+                packages_path = None
+                base_packages_path = os.path.join(dists_path, component, f'binary-{arch}', 'Packages')
+                
+                if os.path.exists(base_packages_path):
+                    packages_path = base_packages_path
+                elif os.path.exists(f'{base_packages_path}.gz'):
+                    packages_path = f'{base_packages_path}.gz'
+                elif os.path.exists(f'{base_packages_path}.xz'):
+                    packages_path = f'{base_packages_path}.xz'
+                elif os.path.exists(f'{base_packages_path}.bz2'):
+                    packages_path = f'{base_packages_path}.bz2'
+                
+                if not packages_path:
+                    logger.debug(f'No Packages file found for {component}/{arch}')
+                    continue
+                
+                # Parse Packages file
+                try:
+                    package_info = self._parse_packages_file(packages_path)
+                    
+                    for package in package_info:
+                        if 'Filename' not in package or 'SHA256' not in package:
+                            continue
+                        
+                        filename = package['Filename']
+                        expected_sha256 = package['SHA256']
+                        
+                        # Construct full path to .deb file
+                        deb_path = os.path.join(repo_path, filename)
+                        
+                        total_count += 1
+                        
+                        if os.path.exists(deb_path):
+                            # Verify SHA256 checksum
+                            actual_sha256 = self._calculate_sha256(deb_path)
+                            if actual_sha256 == expected_sha256:
+                                verified_count += 1
+                                logger.debug(f'Verified package: {os.path.basename(filename)}')
+                            else:
+                                details.append(f'Package checksum mismatch: {os.path.basename(filename)}')
+                                logger.warning(f'SHA256 mismatch for {filename}: expected {expected_sha256}, got {actual_sha256}')
+                        else:
+                            details.append(f'Missing package file: {filename}')
+                            logger.debug(f'Missing package file: {deb_path}')
+                
+                except Exception as e:
+                    details.append(f'Error parsing Packages file for {component}/{arch}: {e}')
+                    logger.error(f'Error parsing {packages_path}: {e}')
+        
+        return {
+            'verified_count': verified_count,
+            'total_count': total_count,
+            'details': details
+        }
+    
+    def _parse_packages_file(self, packages_path: str) -> List[Dict[str, str]]:
+        """Parse APT Packages file and extract package information"""
+        packages = []
+        current_package = {}
+        
+        try:
+            # Handle compressed files
+            if packages_path.endswith('.gz'):
+                with gzip.open(packages_path, 'rt', encoding='utf-8') as f:
+                    content = f.read()
+            elif packages_path.endswith('.xz'):
+                import lzma
+                with lzma.open(packages_path, 'rt', encoding='utf-8') as f:
+                    content = f.read()
+            elif packages_path.endswith('.bz2'):
+                import bz2
+                with bz2.open(packages_path, 'rt', encoding='utf-8') as f:
+                    content = f.read()
+            else:
+                with open(packages_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+            
+            # Parse the content
+            lines = content.split('\n')
+            for line in lines:
+                line = line.strip()
+                
+                if not line:
+                    # Empty line indicates end of package entry
+                    if current_package:
+                        packages.append(current_package)
+                        current_package = {}
+                    continue
+                
+                if ':' in line:
+                    # New field
+                    key, value = line.split(':', 1)
+                    current_package[key.strip()] = value.strip()
+                else:
+                    # Continuation of previous field (multiline)
+                    # For our purposes, we only care about single-line fields
+                    pass
+            
+            # Don't forget the last package if file doesn't end with empty line
+            if current_package:
+                packages.append(current_package)
+        
+        except Exception as e:
+            logger.error(f'Error parsing Packages file {packages_path}: {e}')
+            return []
+        
+        return packages

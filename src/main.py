@@ -247,11 +247,14 @@ def cmd_status(args, orchestrator: ContainerOrchestrator, storage_manager: Stora
         gpg_verified = verification_results['gpg_verified']
         checksums_verified = verification_results['total_checksums_verified']
         files_checked = verification_results['total_files_checked']
+        packages_verified = verification_results['total_packages_verified']
+        packages_checked = verification_results['total_packages_checked']
         
         print(f"\nFile integrity verification: {total} total repositories")
         print(f"  ✓ {verified} verified, ✗ {failed} failed, ? {missing} missing")
         print(f"  GPG signatures verified: {gpg_verified}/{total} repositories")
         print(f"  SHA256 checksums verified: {checksums_verified}/{files_checked} files")
+        print(f"  Package integrity verified: {packages_verified}/{packages_checked} packages")
         
         # Show verified repositories
         verified_repos = [d for d in verification_results['details'] if d['status'] == 'verified']
@@ -260,7 +263,8 @@ def cmd_status(args, orchestrator: ContainerOrchestrator, storage_manager: Stora
             for detail in verified_repos:
                 gpg_status = "✓ GPG" if detail.get('gpg_verified', False) else "✗ GPG"
                 checksum_info = f"{detail.get('checksums_verified', 0)}/{detail.get('total_files_checked', 0)} checksums"
-                print(f"  ✓ {detail['distribution']} {detail['version']}: {gpg_status}, {checksum_info}")
+                package_info = f"{detail.get('packages_verified', 0)}/{detail.get('total_packages', 0)} packages"
+                print(f"  ✓ {detail['distribution']} {detail['version']}: {gpg_status}, {checksum_info}, {package_info}")
         
         # Show issues
         issues_found = False
@@ -272,7 +276,8 @@ def cmd_status(args, orchestrator: ContainerOrchestrator, storage_manager: Stora
                 status_symbol = "✗" if detail['status'] == 'failed' else "?"
                 gpg_status = "✓ GPG" if detail.get('gpg_verified', False) else "✗ GPG"
                 checksum_info = f"{detail.get('checksums_verified', 0)}/{detail.get('total_files_checked', 0)} checksums"
-                print(f"  {status_symbol} {detail['distribution']} {detail['version']}: {detail['details']} ({gpg_status}, {checksum_info})")
+                package_info = f"{detail.get('packages_verified', 0)}/{detail.get('total_packages', 0)} packages"
+                print(f"  {status_symbol} {detail['distribution']} {detail['version']}: {detail['details']} ({gpg_status}, {checksum_info}, {package_info})")
         
         if not issues_found and not verified_repos:
             print("\nNo repositories found or all repositories have issues")
