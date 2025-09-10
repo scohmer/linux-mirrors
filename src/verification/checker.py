@@ -918,6 +918,9 @@ class RepositoryVerifier:
             'Contents-',
             'contrib/Contents-',
             'non-free/Contents-',
+            # Legacy architecture Contents files
+            'Contents-powerpc', 'Contents-s390', 'Contents-sparc', 'Contents-alpha',
+            'Contents-hppa', 'Contents-m68k', 'Contents-sh4', 'Contents-ia64',
             # Binary package files for architectures that may not be mirrored
             'binary-armel/',
             'binary-armhf/',
@@ -982,7 +985,18 @@ class RepositoryVerifier:
         
         # Check architecture filtering
         arch_match = True  # Default to True for non-architecture specific files
-        for arch in ['amd64', 'i386', 'arm64', 'armhf', 'armel', 'ppc64el', 'riscv64', 's390x', 'mips', 'mipsel', 'mips64el', 'ia64', 'kfreebsd-amd64', 'kfreebsd-i386', 'all']:
+        
+        # Comprehensive list of all known Debian/Ubuntu architectures (including legacy ones)
+        all_known_archs = [
+            'amd64', 'i386', 'arm64', 'armhf', 'armel', 'ppc64el', 'riscv64', 's390x', 
+            'mips', 'mipsel', 'mips64el', 'ia64', 'kfreebsd-amd64', 'kfreebsd-i386', 'all',
+            # Legacy architectures from older releases
+            'powerpc', 's390', 'sparc', 'alpha', 'hppa', 'm68k', 'sh4',
+            # Additional Ubuntu architectures
+            'ppc64', 'arm', 'armel'
+        ]
+        
+        for arch in all_known_archs:
             if f'binary-{arch}' in filename or f'Contents-{arch}' in filename:
                 arch_match = arch in configured_archs
                 break
@@ -1070,17 +1084,16 @@ class RepositoryVerifier:
                                 else:
                                     logger.debug(f'Could not decompress {actual_file_path} for verification')
                         else:
-                            # Log first few missing files for debugging to understand the pattern
-                            if debug_missing_count < 5:
-                                logger.warning(f'File not found ({dist_name}): {filename} -> {file_path}')
-                                debug_missing_count += 1
-                            
-                            # Check if this is an optional file
+                            # Check if this is an optional file first
                             if self._is_optional_file(filename, dist_name):
                                 missing_optional_count += 1
                                 # Don't treat optional files as errors - just log for debugging
                                 logger.debug(f'Optional file missing: {filename}')
                             else:
+                                # Only log warning for files we expect to exist (matching our config)
+                                if debug_missing_count < 5:
+                                    logger.warning(f'File not found ({dist_name}): {filename} -> {file_path}')
+                                    debug_missing_count += 1
                                 details.append(f'Missing file for checksum verification: {filename}')
         
         except Exception as e:
