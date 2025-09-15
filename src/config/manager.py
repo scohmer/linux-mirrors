@@ -116,7 +116,7 @@ class MirrorConfig:
                 type="yum",
                 versions=["8", "9", "10"],
                 mirror_urls=["https://cdn.redhat.com/content/dist/rhel"],
-                components=["BaseOS", "AppStream", "PowerTools", "CRB", "extras", "devel", "plus", "HighAvailability", "ResilientStorage", "RT", "NFV", "SAP", "SAPHANA"],
+                components=["BaseOS", "AppStream", "codeready-builder", "supplementary"],
                 architectures=["x86_64"],
                 iso_architectures=["x86_64", "aarch64"],
                 enabled=True,  # Enable RHEL in TUI (requires subscription)

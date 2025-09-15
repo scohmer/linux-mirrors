@@ -48,7 +48,11 @@
       "Read(/C:\\Users\\scohm\\OneDrive\\Github.com\\scohmer\\linux-mirrors\\src\\config/**)",
       "WebFetch(domain:dl.rockylinux.org)",
       "WebSearch",
-      "WebFetch(domain:textual.textualize.io)"
+      "WebFetch(domain:textual.textualize.io)",
+      "Bash(tree:*)",
+      "Read(//home/admin/.config/linux-mirrors/**)",
+      "Bash(podman ps:*)",
+      "Bash(python3:*)"
     ],
     "deny": [],
     "ask": []

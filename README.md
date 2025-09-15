@@ -2,6 +2,15 @@
 
 A containerized Linux repository mirroring system that synchronizes APT and DNF/YUM repositories for multiple Linux distributions.
 
+## Version 1.02
+
+### What's New
+- **Enhanced RHEL Repository Support**: Streamlined RHEL component configuration with focus on essential repositories (BaseOS, AppStream, codeready-builder, supplementary)
+- **Improved APT Repository Sync**: Better handling of additional repositories (security, updates, backports) for Debian and Ubuntu distributions
+- **Enhanced URL Normalization**: Improved URL handling and normalization across all sync engines
+- **Modular APT Sync Engine**: Refactored APT sync engine with separate methods for Debian and Ubuntu additional repositories
+- **Better Architecture Support**: Enhanced support for ARM architectures in Ubuntu repositories using ports.ubuntu.com
+
 ## Features
 
 - **Multi-Distribution Support**: Debian, Ubuntu, Rocky Linux, RHEL, and Kali Linux

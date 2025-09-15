@@ -7,5 +7,5 @@ A containerized Linux repository mirroring system that synchronizes
 APT and DNF/YUM repositories for multiple Linux distributions.
 """
 
-__version__ = "1.0.0"
+__version__ = "1.02"
 __author__ = "Linux Mirror Project"

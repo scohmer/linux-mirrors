@@ -190,61 +190,11 @@ class AptSyncEngine(SyncEngine):
                 src_line = f"deb-src {normalized_url} {version} {components}"
                 config_lines.append(src_line)
         
-        # Add Debian-specific security and backports repositories
+        # Add additional repositories for Debian and Ubuntu (security, updates, backports)
         if self.dist_config.name == "debian":
-            archived_versions = ["wheezy", "jessie", "stretch", "buster", "bullseye"]
-            
-            # Only add security repositories for versions with publicly available security updates
-            # As of 2025: bullseye (LTS), bookworm, trixie have public security updates
-            # stretch/buster only have commercial ELTS, wheezy/jessie are EOL
-            versions_with_security = ["bullseye", "bookworm", "trixie"]
-            
-            if version in versions_with_security:
-                # Security repository
-                if version in archived_versions:
-                    # Archived versions with security (currently bullseye LTS)
-                    security_url = "http://archive.debian.org/debian-security"
-                    security_suite = f"{version}-security"
-                else:
-                    # Current versions use security.debian.org
-                    security_url = "http://security.debian.org/debian-security"
-                    security_suite = f"{version}-security"
-                
-                # Add security repository lines (URLs already clean, no trailing slashes)
-                normalized_security_url = security_url
-                
-                for arch in self.dist_config.architectures:
-                    # Skip 'all' architecture for wheezy security repos
-                    if version == "wheezy" and arch == "all":
-                        continue
-                    security_line = f"deb-{arch} {normalized_security_url} {security_suite} {components}"
-                    config_lines.append(security_line)
-                
-                if getattr(self.dist_config, 'include_source_packages', False):
-                    security_src = f"deb-src {normalized_security_url} {security_suite} {components}"
-                    config_lines.append(security_src)
-            
-            # Backports repository (skip for very old versions that didn't have backports)
-            if version not in ["wheezy"]:  # wheezy didn't have official backports
-                if version in archived_versions:
-                    # Archived backports use archive.debian.org
-                    backports_url = "http://archive.debian.org/debian"
-                else:
-                    # Current backports use deb.debian.org
-                    backports_url = "http://deb.debian.org/debian"
-                
-                backports_suite = f"{version}-backports"
-                
-                # Add backports repository lines (URLs already clean, no trailing slashes)
-                normalized_backports_url = backports_url
-                
-                for arch in self.dist_config.architectures:
-                    backports_line = f"deb-{arch} {normalized_backports_url} {backports_suite} {components}"
-                    config_lines.append(backports_line)
-                
-                if getattr(self.dist_config, 'include_source_packages', False):
-                    backports_src = f"deb-src {normalized_backports_url} {backports_suite} {components}"
-                    config_lines.append(backports_src)
+            self._add_debian_additional_repos(config_lines, version, components, mirror_urls)
+        elif self.dist_config.name == "ubuntu":
+            self._add_ubuntu_additional_repos(config_lines, version, components, mirror_urls)
         
         config_lines.append("")
         # Use appropriate clean URL based on version (URLs already clean, no trailing slashes)
@@ -254,7 +204,130 @@ class AptSyncEngine(SyncEngine):
         result_config = "\n".join(config_lines)
         logger.debug(f"Generated apt-mirror config for {self.dist_config.name} {version}:\n{result_config}")
         return result_config
-    
+
+    def _add_debian_additional_repos(self, config_lines: List[str], version: str, components: str, mirror_urls: List[str]) -> None:
+        """Add Debian-specific additional repositories (security, updates, backports)"""
+        archived_versions = ["wheezy", "jessie", "stretch", "buster", "bullseye"]
+
+        # Security repository
+        # Only add security repositories for versions with publicly available security updates
+        # As of 2025: bullseye (LTS), bookworm, trixie have public security updates
+        versions_with_security = ["bullseye", "bookworm", "trixie"]
+
+        if version in versions_with_security:
+            # All Debian security updates come from security.debian.org regardless of archive status
+            security_url = "http://security.debian.org/debian-security"
+
+            security_suite = f"{version}-security"
+
+            for arch in self.dist_config.architectures:
+                # Skip 'all' architecture for wheezy security repos
+                if version == "wheezy" and arch == "all":
+                    continue
+                security_line = f"deb-{arch} {security_url} {security_suite} {components}"
+                config_lines.append(security_line)
+
+            if getattr(self.dist_config, 'include_source_packages', False):
+                security_src = f"deb-src {security_url} {security_suite} {components}"
+                config_lines.append(security_src)
+
+        # Updates repository
+        # Most Debian versions have updates (except very old ones)
+        versions_with_updates = ["stretch", "buster", "bullseye", "bookworm", "trixie"]
+
+        if version in versions_with_updates:
+            if version in archived_versions:
+                updates_url = "http://archive.debian.org/debian"
+            else:
+                updates_url = "http://deb.debian.org/debian"
+
+            updates_suite = f"{version}-updates"
+
+            for arch in self.dist_config.architectures:
+                updates_line = f"deb-{arch} {updates_url} {updates_suite} {components}"
+                config_lines.append(updates_line)
+
+            if getattr(self.dist_config, 'include_source_packages', False):
+                updates_src = f"deb-src {updates_url} {updates_suite} {components}"
+                config_lines.append(updates_src)
+
+        # Backports repository (skip for very old versions that didn't have backports)
+        if version not in ["wheezy"]:  # wheezy didn't have official backports
+            if version in archived_versions:
+                backports_url = "http://archive.debian.org/debian"
+            else:
+                backports_url = "http://deb.debian.org/debian"
+
+            backports_suite = f"{version}-backports"
+
+            for arch in self.dist_config.architectures:
+                backports_line = f"deb-{arch} {backports_url} {backports_suite} {components}"
+                config_lines.append(backports_line)
+
+            if getattr(self.dist_config, 'include_source_packages', False):
+                backports_src = f"deb-src {backports_url} {backports_suite} {components}"
+                config_lines.append(backports_src)
+
+    def _add_ubuntu_additional_repos(self, config_lines: List[str], version: str, components: str, mirror_urls: List[str]) -> None:
+        """Add Ubuntu-specific additional repositories (security, updates, backports)"""
+        eol_versions = ["mantic"]  # Ubuntu versions that have reached EOL
+
+        # Determine base URLs based on version status
+        if version in eol_versions:
+            base_url = "http://old-releases.ubuntu.com/ubuntu"
+            security_url = "http://old-releases.ubuntu.com/ubuntu"
+        else:
+            base_url = mirror_urls[0].rstrip('/') if mirror_urls else "http://archive.ubuntu.com/ubuntu"
+            security_url = "http://security.ubuntu.com/ubuntu"
+
+        # Security repository
+        security_suite = f"{version}-security"
+        for arch in self.dist_config.architectures:
+            # For Ubuntu, ARM architectures use ports.ubuntu.com for security too
+            if arch in ["arm64", "armhf"] and "archive.ubuntu.com" in security_url:
+                arch_security_url = security_url.replace("archive.ubuntu.com/ubuntu", "ports.ubuntu.com/ubuntu-ports")
+            else:
+                arch_security_url = security_url
+
+            security_line = f"deb-{arch} {arch_security_url} {security_suite} {components}"
+            config_lines.append(security_line)
+
+        if getattr(self.dist_config, 'include_source_packages', False):
+            security_src = f"deb-src {security_url} {security_suite} {components}"
+            config_lines.append(security_src)
+
+        # Updates repository
+        updates_suite = f"{version}-updates"
+        for arch in self.dist_config.architectures:
+            # For Ubuntu, ARM architectures use ports.ubuntu.com
+            if arch in ["arm64", "armhf"] and "archive.ubuntu.com" in base_url:
+                arch_base_url = base_url.replace("archive.ubuntu.com/ubuntu", "ports.ubuntu.com/ubuntu-ports")
+            else:
+                arch_base_url = base_url
+
+            updates_line = f"deb-{arch} {arch_base_url} {updates_suite} {components}"
+            config_lines.append(updates_line)
+
+        if getattr(self.dist_config, 'include_source_packages', False):
+            updates_src = f"deb-src {base_url} {updates_suite} {components}"
+            config_lines.append(updates_src)
+
+        # Backports repository
+        backports_suite = f"{version}-backports"
+        for arch in self.dist_config.architectures:
+            # For Ubuntu, ARM architectures use ports.ubuntu.com
+            if arch in ["arm64", "armhf"] and "archive.ubuntu.com" in base_url:
+                arch_base_url = base_url.replace("archive.ubuntu.com/ubuntu", "ports.ubuntu.com/ubuntu-ports")
+            else:
+                arch_base_url = base_url
+
+            backports_line = f"deb-{arch} {arch_base_url} {backports_suite} {components}"
+            config_lines.append(backports_line)
+
+        if getattr(self.dist_config, 'include_source_packages', False):
+            backports_src = f"deb-src {base_url} {backports_suite} {components}"
+            config_lines.append(backports_src)
+
     def validate_config(self) -> bool:
         required_fields = ['mirror_urls', 'components', 'architectures']
         for field in required_fields:
@@ -496,8 +569,10 @@ class YumSyncEngine(SyncEngine):
         iso_commands.append("mkdir -p /mirror/isos && chmod 777 /mirror/isos")
         
         for mirror_url in self.dist_config.mirror_urls:
+            # Normalize URL by ensuring exactly one trailing slash
+            normalized_url = mirror_url.rstrip('/') + '/'
             for arch in iso_archs:
-                iso_base_url = f"{mirror_url}{version}/isos/{arch}/"
+                iso_base_url = f"{normalized_url}{version}/isos/{arch}/"
                 
                 # Download and verify checksums before downloading ISOs
                 checksum_verification_commands = self._generate_iso_checksum_verification(iso_base_url, version, arch)
@@ -585,11 +660,13 @@ fi
             # Generate standard repo configuration for Rocky/other YUM distros
             for arch in supported_archs:
                 for mirror_url in self.dist_config.mirror_urls:
+                    # Normalize URL by ensuring exactly one trailing slash
+                    normalized_url = mirror_url.rstrip('/') + '/'
                     for repo_id, repo_info in repositories.items():
                         config_lines.extend([
                             f"[{repo_name}-{repo_id}-{arch}]",
                             f"name={self.dist_config.name.title()} {version} - {repo_info['name']} ({arch})",
-                            f"baseurl={mirror_url}{version}/{repo_info['path']}/{arch}/os/",
+                            f"baseurl={normalized_url}{version}/{repo_info['path']}/{arch}/os/",
                             "enabled=1",
                             "gpgcheck=0",  # Disable gpgcheck for now to avoid key issues
                             ""  # Empty line between sections
