@@ -478,6 +478,25 @@ class YumSyncEngine(SyncEngine):
             {'; '.join(commands)} &&
             {' && '.join(createrepo_commands)}
             '''
+        elif self.dist_config.name == "epel":
+            # For EPEL, we need to download and install GPG keys first
+            gpg_key_commands = []
+            if hasattr(self.dist_config, 'gpg_key_urls') and self.dist_config.gpg_key_urls:
+                for gpg_url in self.dist_config.gpg_key_urls:
+                    key_filename = gpg_url.split('/')[-1]  # Extract filename from URL
+                    gpg_key_commands.append(f"curl -sL {gpg_url} -o /etc/pki/rpm-gpg/{key_filename}")
+
+            gpg_setup = ' && '.join(gpg_key_commands) if gpg_key_commands else 'echo "No GPG keys to install"'
+
+            full_command = f'''
+            echo "Setting up EPEL GPG keys..." &&
+            mkdir -p /etc/pki/rpm-gpg &&
+            {gpg_setup} &&
+            echo -e "{escaped_config}" > {config_file} &&
+            {' && '.join(mkdir_commands)} &&
+            {'; '.join(commands)} &&
+            {' && '.join(createrepo_commands)}
+            '''
         else:
             full_command = f'''
             echo -e "{escaped_config}" > {config_file} &&
@@ -489,9 +508,9 @@ class YumSyncEngine(SyncEngine):
         return ['sh', '-c', full_command]
     
     def _get_supported_architectures(self, version: str) -> List[str]:
-        """Filter architectures based on version support for Rocky Linux and RHEL."""
+        """Filter architectures based on version support for Rocky Linux, RHEL, and EPEL."""
         all_archs = self.dist_config.architectures
-        
+
         # Rocky Linux and RHEL architecture support by version
         if self.dist_config.name in ["rocky", "rhel"]:
             if version == "8":
@@ -503,7 +522,15 @@ class YumSyncEngine(SyncEngine):
             elif version == "10":
                 # Rocky/RHEL 10 supports x86_64, aarch64, ppc64le, s390x, riscv64
                 return [arch for arch in all_archs if arch in ["x86_64", "aarch64", "ppc64le", "s390x", "riscv64"]]
-        
+        elif self.dist_config.name == "epel":
+            # EPEL architecture support by version
+            if version == "8":
+                # EPEL 8 supports x86_64, aarch64, ppc64le, s390x
+                return [arch for arch in all_archs if arch in ["x86_64", "aarch64", "ppc64le", "s390x"]]
+            elif version in ["9", "10"]:
+                # EPEL 9+ supports x86_64, aarch64, ppc64le, s390x
+                return [arch for arch in all_archs if arch in ["x86_64", "aarch64", "ppc64le", "s390x"]]
+
         # For other distributions, return all architectures
         return all_archs
 
@@ -656,6 +683,22 @@ fi
                         "sslclientcert=/etc/pki/entitlement/",
                         ""  # Empty line between sections
                     ])
+        elif self.dist_config.name == "epel":
+            # Generate EPEL-specific repo configuration
+            for arch in supported_archs:
+                for mirror_url in self.dist_config.mirror_urls:
+                    # Normalize URL by ensuring exactly one trailing slash
+                    normalized_url = mirror_url.rstrip('/') + '/'
+                    for repo_id, repo_info in repositories.items():
+                        config_lines.extend([
+                            f"[{repo_name}-{repo_id}-{arch}]",
+                            f"name=Extra Packages for Enterprise Linux {version} - {repo_info['name']} ({arch})",
+                            f"baseurl={normalized_url}{version}/{repo_info['path']}/{arch}/",
+                            "enabled=1",
+                            "gpgcheck=1",
+                            f"gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-{version}",
+                            ""  # Empty line between sections
+                        ])
         else:
             # Generate standard repo configuration for Rocky/other YUM distros
             for arch in supported_archs:

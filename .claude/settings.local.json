@@ -52,7 +52,8 @@
       "Bash(tree:*)",
       "Read(//home/admin/.config/linux-mirrors/**)",
       "Bash(podman ps:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "WebFetch(domain:docs.fedoraproject.org)"
     ],
     "deny": [],
     "ask": []

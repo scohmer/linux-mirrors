@@ -26,7 +26,8 @@ A containerized Linux repository mirroring system that synchronizes APT and DNF/
 - **Debian** (version 7+)
 - **Ubuntu** (version 18.04+)
 - **Rocky Linux** (version 8+)
-- **Red Hat Enterprise Linux** (version 8+) 
+- **Red Hat Enterprise Linux** (version 8+)
+- **EPEL** (Extra Packages for Enterprise Linux - versions 8, 9, 10)
 - **Kali Linux**
 
 ## Installation
@@ -275,7 +276,59 @@ distributions:
       - arm64
     enabled: true
     sync_schedule: daily
+
+  epel:
+    name: epel
+    type: yum
+    versions:
+      - "8"
+      - "9"
+      - "10"
+    mirror_urls:
+      - https://dl.fedoraproject.org/pub/epel
+    components:
+      - Everything
+    architectures:
+      - x86_64
+      - aarch64
+    enabled: true
+    include_gpg_keys: true
+    gpg_key_urls:
+      - https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-8
+      - https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-9
+      - https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-10
 ```
+
+## EPEL Support
+
+**EPEL (Extra Packages for Enterprise Linux)** is a special interest group from the Fedora Project that provides additional packages for RHEL and compatible distributions like Rocky Linux and AlmaLinux.
+
+### Features
+
+- **Automatic GPG Key Management**: GPG keys for signature verification are automatically downloaded and configured
+- **Multiple Architecture Support**: x86_64, aarch64, ppc64le, s390x (depending on EPEL version)
+- **Version Support**: EPEL 8, 9, and 10 (EPEL 7 is archived but accessible)
+- **Integrated with YUM Sync Engine**: Uses the same containerized sync process as Rocky Linux and RHEL
+
+### EPEL Versions
+
+- **EPEL 8**: Compatible with RHEL 8, Rocky Linux 8, AlmaLinux 8
+- **EPEL 9**: Compatible with RHEL 9, Rocky Linux 9, AlmaLinux 9
+- **EPEL 10**: Compatible with RHEL 10, Rocky Linux 10, AlmaLinux 10
+
+### Repository Structure
+
+EPEL repositories are organized differently from standard RHEL repositories:
+- Uses `Everything` as the primary component instead of `BaseOS`/`AppStream`
+- Repository path: `{version}/Everything/{arch}/`
+- No ISO images (packages only)
+
+### Configuration Notes
+
+- GPG signature verification is enabled by default for security
+- GPG keys are automatically downloaded from https://dl.fedoraproject.org/pub/epel/
+- Mirror URL uses the official Fedora download infrastructure
+- Supports both x86_64 and ARM64 architectures in the default configuration
 
 ## Architecture
 
@@ -289,7 +342,8 @@ distributions:
 │   └── kali/
 └── yum/
     ├── rocky/
-    └── rhel/
+    ├── rhel/
+    └── epel/
 ```
 
 ### Components

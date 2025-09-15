@@ -340,10 +340,54 @@ class TestConfigManagerIntegration:
         """Test that config directory is created if it doesn't exist"""
         with tempfile.TemporaryDirectory() as temp_dir:
             nested_path = os.path.join(temp_dir, "nested", "dir", "config.yaml")
-            
+
             manager = ConfigManager(nested_path)
             manager.load_config()
             manager.save_config()
-            
+
             assert os.path.exists(nested_path)
             assert os.path.exists(os.path.dirname(nested_path))
+
+    def test_epel_default_configuration(self):
+        """Test that EPEL is included in default configuration"""
+        # Test the default configuration directly instead of loaded config
+        from src.config.manager import MirrorConfig
+        config = MirrorConfig()
+
+        # Verify EPEL is present in default distributions
+        assert "epel" in config.distributions
+        epel_config = config.distributions["epel"]
+
+        # Verify EPEL configuration properties
+        assert epel_config.name == "epel"
+        assert epel_config.type == "yum"
+        assert epel_config.enabled is True
+        assert "8" in epel_config.versions
+        assert "9" in epel_config.versions
+        assert "10" in epel_config.versions
+        assert "x86_64" in epel_config.architectures
+        assert "aarch64" in epel_config.architectures
+        assert epel_config.components == ["Everything"]
+        assert epel_config.include_gpg_keys is True
+        assert len(epel_config.gpg_key_urls) == 3  # Keys for versions 8, 9, 10
+        assert "https://dl.fedoraproject.org/pub/epel" in epel_config.mirror_urls[0]
+
+    def test_epel_custom_configuration(self):
+        """Test creating custom EPEL configuration"""
+        epel_config = DistributionConfig(
+            name="epel",
+            type="yum",
+            versions=["9"],  # Only EPEL 9
+            mirror_urls=["https://custom-mirror.example.com/epel"],
+            components=["Everything"],
+            architectures=["x86_64"],
+            enabled=True,
+            include_gpg_keys=True,
+            gpg_key_urls=["https://custom-mirror.example.com/RPM-GPG-KEY-EPEL-9"]
+        )
+
+        assert epel_config.name == "epel"
+        assert epel_config.type == "yum"
+        assert epel_config.versions == ["9"]
+        assert epel_config.architectures == ["x86_64"]
+        assert epel_config.include_gpg_keys is True
