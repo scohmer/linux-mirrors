@@ -28,6 +28,9 @@ class DistributionConfig:
     http_proxy: str = None
     https_proxy: str = None
     no_proxy: str = None
+    # RHEL-specific certificate and subscription paths
+    rhel_entitlement_path: str = None  # Path to entitlement certificates (default: /etc/pki/entitlement)
+    rhel_rhsm_path: str = None  # Path to RHSM directory (default: /etc/rhsm)
 
 @dataclass
 class MirrorConfig:
@@ -116,7 +119,9 @@ class MirrorConfig:
                 components=["BaseOS", "AppStream", "PowerTools", "CRB", "extras", "devel", "plus", "HighAvailability", "ResilientStorage", "RT", "NFV", "SAP", "SAPHANA"],
                 architectures=["x86_64"],
                 iso_architectures=["x86_64", "aarch64"],
-                enabled=True  # Enable RHEL in TUI (requires subscription)
+                enabled=True,  # Enable RHEL in TUI (requires subscription)
+                rhel_entitlement_path="/etc/pki/entitlement",
+                rhel_rhsm_path="/etc/rhsm"
             )
         }
 
@@ -246,6 +251,11 @@ distributions:
             template += f"    include_gpg_keys: {str(dist_config['include_gpg_keys']).lower()}\n"
             template += f"    include_installer_images: {str(dist_config['include_installer_images']).lower()}\n"
             template += f"    include_source_packages: {str(dist_config['include_source_packages']).lower()}\n"
+            # Add RHEL-specific configuration
+            if dist_name == "rhel":
+                template += f"    # RHEL subscription paths (customize if certificates are in different locations)\n"
+                template += f"    rhel_entitlement_path: {dist_config.get('rhel_entitlement_path', '/etc/pki/entitlement')}\n"
+                template += f"    rhel_rhsm_path: {dist_config.get('rhel_rhsm_path', '/etc/rhsm')}\n"
             template += f"    # Per-distribution proxy overrides (uncomment if needed)\n"
             template += f"    # http_proxy: \"http://proxy.company.com:8080\"\n"
             template += f"    # https_proxy: \"http://proxy.company.com:8080\"\n"

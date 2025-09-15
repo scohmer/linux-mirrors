@@ -193,10 +193,14 @@ VOLUME ["/mirror"]
             
             # Add distribution-specific configurations
             if dist_config.name == "rhel":
+                # Use configurable paths for RHEL entitlement and RHSM directories
+                entitlement_path = getattr(dist_config, 'rhel_entitlement_path', None) or '/etc/pki/entitlement'
+                rhsm_path = getattr(dist_config, 'rhel_rhsm_path', None) or '/etc/rhsm'
+
                 create_cmd.extend([
                     '--user', 'root',  # RHEL sync requires root for dnf operations
-                    '--volume', '/etc/pki/entitlement:/etc/pki/entitlement:ro',
-                    '--volume', '/etc/rhsm/rhsm.conf:/etc/rhsm/rhsm.conf:ro',
+                    '--volume', f'{entitlement_path}:/etc/pki/entitlement:ro',
+                    '--volume', f'{rhsm_path}:/etc/rhsm:ro',  # Mount entire rhsm directory for CA certs
                 ])
             elif dist_config.name == "rocky":
                 create_cmd.extend([
