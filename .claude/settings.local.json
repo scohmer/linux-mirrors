@@ -48,7 +48,20 @@
       "Read(/C:\\Users\\scohm\\OneDrive\\Github.com\\scohmer\\linux-mirrors\\src\\config/**)",
       "WebFetch(domain:dl.rockylinux.org)",
       "WebSearch",
-      "WebFetch(domain:textual.textualize.io)"
+      "WebFetch(domain:textual.textualize.io)",
+      "Bash(tree:*)",
+      "Read(//home/admin/.config/linux-mirrors/**)",
+      "Bash(podman ps:*)",
+      "Bash(python3:*)",
+      "WebFetch(domain:docs.fedoraproject.org)",
+      "Read(//home/admin/.config/**)",
+      "Bash(podman logs linux-mirror-epel-8)",
+      "Bash(podman logs:*)",
+      "Bash(podman stop:*)",
+      "Bash(podman rm:*)",
+      "Bash(for version in 8 9 10)",
+      "Bash(do echo \"=== EPEL $version ===\")",
+      "Bash(done)"
     ],
     "deny": [],
     "ask": []

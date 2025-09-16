@@ -116,12 +116,27 @@ class MirrorConfig:
                 type="yum",
                 versions=["8", "9", "10"],
                 mirror_urls=["https://cdn.redhat.com/content/dist/rhel"],
-                components=["BaseOS", "AppStream", "PowerTools", "CRB", "extras", "devel", "plus", "HighAvailability", "ResilientStorage", "RT", "NFV", "SAP", "SAPHANA"],
+                components=["BaseOS", "AppStream", "codeready-builder", "supplementary"],
                 architectures=["x86_64"],
                 iso_architectures=["x86_64", "aarch64"],
                 enabled=True,  # Enable RHEL in TUI (requires subscription)
                 rhel_entitlement_path="/etc/pki/entitlement",
                 rhel_rhsm_path="/etc/rhsm"
+            ),
+            "epel": DistributionConfig(
+                name="epel",
+                type="yum",
+                versions=["8", "9", "10"],  # Active versions (7 is archived)
+                mirror_urls=["https://dl.fedoraproject.org/pub/epel"],
+                components=["Everything"],  # EPEL uses Everything as the main component
+                architectures=["x86_64", "aarch64"],
+                enabled=True,
+                include_gpg_keys=True,
+                gpg_key_urls=[
+                    "https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-8",
+                    "https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-9",
+                    "https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-10"
+                ]
             )
         }
 

@@ -584,10 +584,120 @@ class TestSyncEngineIntegration:
         mock_orchestrator.start_sync_container.assert_called_once_with("test-container")
 
 
+class TestEpelSyncEngine:
+    """Test EPEL-specific functionality in YumSyncEngine"""
+
+    def setup_method(self):
+        """Set up EPEL test fixtures"""
+        self.epel_config = DistributionConfig(
+            name="epel",
+            type="yum",
+            versions=["8", "9", "10"],
+            mirror_urls=["https://dl.fedoraproject.org/pub/epel"],
+            components=["Everything"],
+            architectures=["x86_64", "aarch64"],
+            enabled=True,
+            include_gpg_keys=True,
+            gpg_key_urls=[
+                "https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-8",
+                "https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-9",
+                "https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-10"
+            ]
+        )
+        self.mock_orchestrator = Mock(spec=ContainerOrchestrator)
+
+    def test_epel_sync_engine_creation(self):
+        """Test that EPEL sync engine can be created"""
+        engine = YumSyncEngine(self.epel_config, self.mock_orchestrator)
+        assert engine.dist_config.name == "epel"
+        assert engine.dist_config.type == "yum"
+
+    def test_epel_validate_config(self):
+        """Test EPEL configuration validation"""
+        engine = YumSyncEngine(self.epel_config, self.mock_orchestrator)
+        assert engine.validate_config() is True
+
+    def test_epel_repo_config_generation(self):
+        """Test EPEL repository configuration generation"""
+        engine = YumSyncEngine(self.epel_config, self.mock_orchestrator)
+        repo_config = engine._generate_yum_repo_config("9")
+
+        # Check that EPEL-specific configuration is generated
+        assert "Extra Packages for Enterprise Linux 9" in repo_config
+        assert "baseurl=https://dl.fedoraproject.org/pub/epel/9/Everything/" in repo_config
+        assert "gpgcheck=1" in repo_config
+        assert "RPM-GPG-KEY-EPEL-9" in repo_config
+
+    def test_epel_supported_architectures(self):
+        """Test EPEL supported architectures by version"""
+        engine = YumSyncEngine(self.epel_config, self.mock_orchestrator)
+
+        # Test EPEL 8 architectures (filtered by configured architectures)
+        epel8_archs = engine._get_supported_architectures("8")
+        assert "x86_64" in epel8_archs
+        assert "aarch64" in epel8_archs
+        # ppc64le and s390x are supported by EPEL but not in our test config
+
+        # Test EPEL 9+ architectures (filtered by configured architectures)
+        epel9_archs = engine._get_supported_architectures("9")
+        assert "x86_64" in epel9_archs
+        assert "aarch64" in epel9_archs
+        # ppc64le and s390x are supported by EPEL but not in our test config
+
+        # The method should return only architectures that are both
+        # supported by EPEL and configured in the distribution config
+        assert len(epel8_archs) == 2  # x86_64, aarch64
+        assert len(epel9_archs) == 2  # x86_64, aarch64
+
+    def test_epel_sync_command_includes_gpg_setup(self):
+        """Test that EPEL sync command includes GPG key setup"""
+        engine = YumSyncEngine(self.epel_config, self.mock_orchestrator)
+        command = engine.generate_sync_command("9")
+
+        # Verify it's a shell command
+        assert command[0] == 'sh'
+        assert command[1] == '-c'
+
+        # Verify GPG setup is included in the command
+        full_command = command[2]
+        assert "Setting up EPEL GPG keys" in full_command
+        assert "mkdir -p /etc/pki/rpm-gpg" in full_command
+        assert "curl -sL https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL" in full_command
+
+    def test_epel_available_repositories(self):
+        """Test EPEL available repositories"""
+        engine = YumSyncEngine(self.epel_config, self.mock_orchestrator)
+        repos = engine._get_available_repositories("9")
+
+        # EPEL should have Everything component
+        assert "everything" in repos
+        assert repos["everything"]["name"] == "Everything"
+        assert repos["everything"]["path"] == "Everything"
+
+    @pytest.mark.asyncio
+    async def test_epel_sync_version(self):
+        """Test EPEL version sync execution"""
+        engine = YumSyncEngine(self.epel_config, self.mock_orchestrator)
+
+        # Mock the orchestrator methods properly
+        self.mock_orchestrator.create_sync_container.return_value = "epel-container"
+        self.mock_orchestrator.start_sync_container = AsyncMock(return_value={"StatusCode": 0})
+        self.mock_orchestrator.stop_sync_container = AsyncMock()
+        self.mock_orchestrator.remove_sync_container = AsyncMock()
+
+        result = await engine.sync_version("9")
+
+        assert result is not None
+        assert result['distribution'] == 'epel'
+        assert result['version'] == '9'
+        # Note: The actual status depends on the mock setup and sync engine logic
+        assert 'status' in result
+
+
 @pytest.mark.slow
 class TestSyncManagerStressTests:
     """Stress tests for sync manager"""
-    
+
     @pytest.mark.asyncio
     async def test_concurrent_sync_limits(self):
         """Test that concurrent sync limits are respected"""

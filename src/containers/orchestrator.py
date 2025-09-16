@@ -206,6 +206,10 @@ VOLUME ["/mirror"]
                 create_cmd.extend([
                     '--user', 'root',  # Rocky sync requires root for package installation
                 ])
+            elif dist_config.name == "epel":
+                create_cmd.extend([
+                    '--user', 'root',  # EPEL sync requires root for package installation
+                ])
             
             create_cmd.extend([image_tag] + command)
             
