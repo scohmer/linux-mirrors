@@ -10,7 +10,7 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
 
 setup(
     name="linux-mirrors",
-    version="1.2.1",
+    version="1.2.2",
     author="Linux Mirror Project",
     description="Containerized Linux repository mirroring system",
     long_description=long_description,

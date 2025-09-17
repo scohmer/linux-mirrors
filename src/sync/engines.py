@@ -161,6 +161,28 @@ class AptSyncEngine(SyncEngine):
         # Return mapped codename if numeric version provided, otherwise return as-is
         return debian_version_map.get(version, version)
 
+    def _filter_components_for_version(self, version: str, components: list) -> list:
+        """Filter out components that don't exist for specific Debian versions"""
+        if self.dist_config.name != "debian":
+            return components
+
+        # Map to codename if needed
+        codename = self._get_debian_codename(version)
+
+        # non-free-firmware was introduced in Debian 12 (bookworm)
+        # Prior versions don't have this component
+        versions_without_nonfree_firmware = [
+            "wheezy", "jessie", "stretch", "buster", "bullseye"
+        ]
+
+        if codename in versions_without_nonfree_firmware:
+            filtered_components = [c for c in components if c != "non-free-firmware"]
+            if "non-free-firmware" in components:
+                logger.info(f"Excluding 'non-free-firmware' component for Debian {codename} (not available)")
+            return filtered_components
+
+        return components
+
     def _generate_apt_mirror_config(self, version: str) -> str:
         # Map numeric Debian versions to codenames if needed
         if self.dist_config.name == "debian":
@@ -181,12 +203,14 @@ class AptSyncEngine(SyncEngine):
             f"set _tilde 0",
             ""
         ]
-        
+
         # Get version-specific mirror URLs
         mirror_urls = self._get_version_specific_urls(version)
-        
+
         # Add main repository lines
-        components = " ".join(self.dist_config.components)
+        # Filter components based on version availability
+        filtered_components = self._filter_components_for_version(version, self.dist_config.components)
+        components = " ".join(filtered_components)
         for mirror_url in mirror_urls:
             # URLs already have trailing slashes removed in _get_version_specific_urls
             normalized_url = mirror_url
