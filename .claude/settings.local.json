@@ -61,7 +61,10 @@
       "Bash(podman rm:*)",
       "Bash(for version in 8 9 10)",
       "Bash(do echo \"=== EPEL $version ===\")",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(cat:*)",
+      "Bash(podman exec:*)",
+      "Bash(podman inspect:*)"
     ],
     "deny": [],
     "ask": []

@@ -121,6 +121,8 @@ class AptSyncEngine(SyncEngine):
         """Get appropriate mirror URLs based on version for distribution-specific handling"""
         # Special handling for Debian archived versions
         if self.dist_config.name == "debian":
+            # Ensure we're using codenames for Debian
+            version = self._get_debian_codename(version)
             archived_versions = ["wheezy", "jessie", "stretch", "buster"]
             if version in archived_versions:
                 return ["http://archive.debian.org/debian"]
@@ -142,7 +144,29 @@ class AptSyncEngine(SyncEngine):
         # For other distributions, strip trailing slashes from configured mirror URLs
         return [url.rstrip('/') for url in self.dist_config.mirror_urls]
 
+    def _get_debian_codename(self, version: str) -> str:
+        """Map Debian numeric versions to codenames"""
+        debian_version_map = {
+            '7': 'wheezy',
+            '8': 'jessie',
+            '9': 'stretch',
+            '10': 'buster',
+            '11': 'bullseye',
+            '12': 'bookworm',
+            '13': 'trixie',
+            '14': 'forky',
+            'sid': 'sid',
+            'unstable': 'unstable'
+        }
+        # Return mapped codename if numeric version provided, otherwise return as-is
+        return debian_version_map.get(version, version)
+
     def _generate_apt_mirror_config(self, version: str) -> str:
+        # Map numeric Debian versions to codenames if needed
+        if self.dist_config.name == "debian":
+            version = self._get_debian_codename(version)
+            logger.debug(f"Using Debian codename: {version}")
+
         base_path = "/mirror"
         config_lines = [
             f"set base_path {base_path}",
@@ -207,6 +231,8 @@ class AptSyncEngine(SyncEngine):
 
     def _add_debian_additional_repos(self, config_lines: List[str], version: str, components: str, mirror_urls: List[str]) -> None:
         """Add Debian-specific additional repositories (security, updates, backports)"""
+        # Ensure we're using codenames for Debian
+        version = self._get_debian_codename(version)
         archived_versions = ["wheezy", "jessie", "stretch", "buster", "bullseye"]
 
         # Security repository
