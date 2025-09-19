@@ -431,11 +431,12 @@ class YumSyncEngine(SyncEngine):
                     repo_tmp = f"/tmp/sync/rhel-{version}-{repo_id.lower()}-rpms-{arch}"
                     
                     # RHEL sync command with entitlement authentication
+                    # Include both the specific architecture and noarch packages
                     cmd = f"""
                     echo "Installing required packages for RHEL sync..." &&
                     dnf install -y dnf-plugins-core rsync &&
                     echo "Starting RHEL sync for {repo_id} {arch}..." &&
-                    dnf reposync --config={config_file} --repoid=rhel-{version}-{repo_id.lower()}-rpms-{arch} --arch={arch} -p /tmp/sync --download-metadata --downloadcomps --newest-only --verbose 2>&1 &&
+                    dnf reposync --config={config_file} --repoid=rhel-{version}-{repo_id.lower()}-rpms-{arch} --arch={arch} --arch=noarch -p /tmp/sync --download-metadata --downloadcomps --newest-only --verbose 2>&1 &&
                     echo "Sync completed, checking results..." &&
                     ls -la /tmp/sync/ &&
                     if [ -d {repo_tmp} ]; then
@@ -469,11 +470,12 @@ class YumSyncEngine(SyncEngine):
                             repo_tmp = f"/tmp/sync/{repo_name}-{repo_id}-{arch}"
                             
                             # Standard sync command
+                            # Include both the specific architecture and noarch packages
                             cmd = f"""
                             echo "Installing rsync for safe file transfers..." &&
                             dnf install -y rsync &&
                             echo "Starting sync for {repo_id} {arch}..." &&
-                            dnf reposync --config={config_file} --repoid={repo_name}-{repo_id}-{arch} --arch={arch} -p /tmp/sync --download-metadata --downloadcomps --newest-only --verbose 2>&1 &&
+                            dnf reposync --config={config_file} --repoid={repo_name}-{repo_id}-{arch} --arch={arch} --arch=noarch -p /tmp/sync --download-metadata --downloadcomps --newest-only --verbose 2>&1 &&
                         echo "Sync completed, checking results..." &&
                         ls -la /tmp/sync/ &&
                         if [ -d {repo_tmp} ]; then
